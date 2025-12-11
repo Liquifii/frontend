@@ -1,0 +1,49 @@
+/* :root {
+  background-color: #181818;
+  color: rgba(255, 255, 255, 0.87);
+  color-scheme: light dark;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-synthesis: none;
+  font-weight: 400;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    background-color: #f8f8f8;
+    color: #181818;
+  }
+} */
+
+
+@import "tailwindcss";
+
+.bg-nav-gradient {
+  background: linear-gradient(180deg, #050505 -47.47%, rgba(13, 13, 13, 0.1) 226.77%);
+}
+
+.badge-cyan {
+  background: linear-gradient(135deg, #1de1ff 0%, #1aa4ff 100%);
+}
+
+.badge-green {
+  background: linear-gradient(135deg, #32f5a1 0%, #0ece7a 100%);
+}
+
+.badge-purple {
+  background: linear-gradient(135deg, #c833f5 0%, #5c3cfd 100%);
+}
+
+.cta-bg {
+  background-image: url('/cta-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+
