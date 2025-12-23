@@ -1,5 +1,5 @@
 import React from 'react'
-import { ShieldCheck, TrendingUp, Bot, LockKeyhole, Gamepad2, LineChart } from 'lucide-react'
+import { ShieldCheck, TrendingUp, Bot, LockKeyhole, Wallet, LineChart } from 'lucide-react'
 
 type Feature = {
   title: string
@@ -37,7 +37,7 @@ const features: Feature[] = [
   {
     title: 'Instant Withdrawals',
     description: 'No lock-ups, no penalties, no waiting. Withdraw anytime with one click. True financial freedom.',
-    icon: Gamepad2,
+    icon: Wallet,
     badgeClass: 'badge-cyan',
   },
   {
@@ -50,10 +50,10 @@ const features: Feature[] = [
 
 const Features = () => {
   return (
-    <section className="w-full py-12 px-4 bg-[#221F24]">
+    <section className="w-full py-12 px-4" style={{ backgroundColor: '#141414' }}>
 
-        <div className='text-center mx-auto p-14'>
-            <h3 className='text-white font-semibold tracking-tight  text-2xl'> Everything You Need to Earn with Confidence</h3>
+        <div className='text-center mx-auto py-14 px-4'>
+            <h3 className='text-white font-semibold tracking-tight text-3xl md:text-4xl mb-2'>Everything You Need to Earn with Confidence</h3>
             <p className='text-[#939393F2]'>Professional-grade features designed for everyone</p>
         </div>
 
@@ -61,7 +61,7 @@ const Features = () => {
         {features.map(({ title, description, icon: Icon, badgeClass }) => (
           <div
             key={title}
-            className="relative overflow-hidden rounded-2xl bg-[#2b262f] p-6 text-white shadow-lg"
+            className="relative overflow-hidden rounded-2xl bg-[#0a0a0a] border border-white/5 p-6 text-white shadow-lg"
           >
             <div
               className={`absolute -right-4 -top-4 flex h-14 w-14 items-center justify-center rounded-xl ${badgeClass} shadow-[0_0_35px_rgba(0,0,0,0.45)] ring-1 ring-white/10`}

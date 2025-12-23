@@ -1,13 +1,13 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Shield, ArrowRight, DollarSign } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HeroSection() {
 
   return (
-    <section className="relative overflow-hidden pt-32 pb-20" style={{ background: 'linear-gradient(180deg, #221F24 100%, #2a2630 50%, #221F24 100%)' }}>
+    <section className="relative overflow-hidden pt-32 pb-20" style={{ backgroundColor: '#141414' }}>
       {/* Animated Background */}
       <div className="absolute inset-0 -z-10">
         <motion.div
@@ -20,7 +20,7 @@ export default function HeroSection() {
             repeat: Infinity,
             ease: 'linear',
           }}
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-gradient-to-br from-blue-500/10 via-blue-400/5 to-blue-500/10 rounded-full blur-3xl"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-gradient-to-br from-purple-900/20 via-blue-900/10 to-purple-900/20 rounded-full blur-3xl"
         />
         <motion.div
           animate={{
@@ -33,7 +33,7 @@ export default function HeroSection() {
             ease: 'linear',
             delay: 5,
           }}
-          className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-gradient-to-br from-blue-400/8 via-blue-500/5 to-blue-400/8 rounded-full blur-3xl"
+          className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-gradient-to-br from-blue-900/15 via-purple-900/10 to-blue-900/15 rounded-full blur-3xl"
         />
       </div>
 
@@ -44,12 +44,12 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-dark-coal/80 border border-[#2BA3FF] rounded-full text-primary font-medium mb-6 backdrop-blur-sm shadow-lg"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#2BA3FF] rounded-full text-white font-medium mb-6"
           >
-          
-              <Shield className="h-4 w-4 text-black bg-[#2BA3FF]" />
-        
-            <span className="text-sm text-white"> Verified by Self Protocol</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-sm">Verified by Self Protocol</span>
           </motion.div>
 
           {/* Main Heading */}
@@ -59,23 +59,7 @@ export default function HeroSection() {
             transition={{ duration: 0.8, delay: 0.3 }}
             className="text-5xl md:text-7xl font-bold text-white leading-tight mb-6"
           >
-            Automated DeFi
-            <motion.span
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.8 }}
-              className="block bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent"
-            >
-              Yield Generation
-            </motion.span>
-            <motion.span
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 1.1 }}
-              className="block text-5xl md:text-6xl mt-2"
-            >
-              on Celo
-            </motion.span>
+            Automated DeFi Yield Generation
           </motion.h1>
 
           {/* Subtitle */}
@@ -83,29 +67,9 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className="text-xl md:text-2xl text-text-secondary mb-8 leading-relaxed"
+            className="text-xl md:text-2xl text-white mb-8 leading-relaxed"
           >
-            Verify once, earn forever. We <motion.span
-              initial={{ scale: 1 }}
-              whileHover={{ scale: 1.1 }}
-              className="font-semibold text-text-primary inline-block"
-            >
-              deploy your funds
-            </motion.span> to 
-            DeFi protocols for <motion.span
-              initial={{ scale: 1 }}
-              whileHover={{ scale: 1.1 }}
-              className="font-semibold text-primary inline-block"
-            >
-              3-15% APY
-            </motion.span>. 
-            AI-powered, <motion.span
-              initial={{ scale: 1 }}
-              whileHover={{ scale: 1.1 }}
-              className="font-semibold text-text-primary inline-block"
-            >
-              fully automated
-            </motion.span>.
+            Verify once, earn forever. We deploy your funds to DeFi protocols for 3-15% APY. AI-powered, fully automated.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -116,28 +80,23 @@ export default function HeroSection() {
             className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
           >
             <motion.button
-              whileHover={{ scale: 1.05, y: -2 }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="group px-8 py-4 bg-[#2BA3FF] text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+              className="group px-8 py-4 bg-[#2BA3FF] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
             >
               <Link href="/dashboard" className="flex items-center gap-2">
                 Launch App
-                <motion.div
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
-                  <ArrowRight className="h-5 w-5 text-white group-hover:translate-x-1 transition-transform" />
-                </motion.div>
+                <ArrowRight className="h-5 w-5 text-white" />
               </Link>
             </motion.button>
             
             <motion.a
-              whileHover={{ scale: 1.05, y: -2 }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               href="#how-it-works"
-              className="px-8 py-4 bg-dark-coal/80 border-2 border-white text-white rounded-2xl font-semibold hover:border-primary hover:shadow-md transition-all duration-300 flex items-center justify-center backdrop-blur-sm"
+              className="px-8 py-4 bg-[#2b262f] border border-white text-white rounded-xl font-semibold hover:bg-[#3a3540] transition-all duration-300 flex items-center justify-center"
             >
-              See How It Works
+              How it works
             </motion.a>
           </motion.div>
 
@@ -146,30 +105,28 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.9 }}
-            className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-8 text-sm"
+            className="flex flex-row justify-center items-center gap-12 text-sm"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 1.1 }}
-              whileHover={{ scale: 1.05 }}
               className="text-center"
             >
-              <div className="text-4xl font-bold text-[#777777] mb-2">100%</div>
-              <div className="text-lg font-semibold text-[#777777] mb-1">Privacy Protected</div>
-              <div className='text-[#777777]'>Zero-Knowledge Proofs</div>
+              <div className="text-4xl font-bold text-white mb-1">100%</div>
+              <div className="text-base font-semibold text-white mb-1">Privacy Protected</div>
+              <div className='text-white text-sm'>Zero-knowledge proofs</div>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 1.2 }}
-              whileHover={{ scale: 1.05 }}
               className="text-center"
             >
-              <div className="text-4xl font-bold text-[#777777] mb-2">$0</div>
-              <div className="text-lg font-semibold text-[#777777] mb-1">Platform Fees</div>
-              <div className='text-[#777777]'>NO hidden costs</div>
+              <div className="text-4xl font-bold text-white mb-1">$0</div>
+              <div className="text-base font-semibold text-white mb-1">Platform Fees</div>
+              <div className='text-white text-sm'>No hidden costs</div>
             </motion.div>
           </motion.div>
 

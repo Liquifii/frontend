@@ -1,4 +1,5 @@
 import React from 'react'
+import Image from 'next/image'
 import { Sun } from 'lucide-react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 
@@ -14,7 +15,16 @@ const Navbar = () => {
   return (
     <nav className="w-full text-white bg-nav-gradient">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="text-xl font-bold">Attestify</div>
+        <div className="flex items-center gap-2">
+          <Image 
+            src="/LiquiFi TP Logo 1.png" 
+            alt="LiquiFi Logo" 
+            width={120} 
+            height={40}
+            className="h-8 w-auto"
+            priority
+          />
+        </div>
 
         <div className="flex items-center space-x-3">
           <Sun size={20} className="text-white" />
@@ -34,7 +44,7 @@ const Navbar = () => {
             <button
               onClick={onConnect}
               disabled={connectStatus === 'pending'}
-              className="bg-[#2BA3FF] hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-md"
+              className="border border-[#2BA3FF] hover:bg-[#2BA3FF]/10 disabled:opacity-60 text-white px-4 py-2 rounded-md transition-colors"
             >
               {connectStatus === 'pending' ? 'Connecting…' : 'Connect Wallet'}
             </button>
