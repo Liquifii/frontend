@@ -1,10 +1,9 @@
 import React from 'react'
-import { UserCheck, Wallet } from 'lucide-react'
-import { User, TrendingUp, DollarSign } from 'lucide-react';
+import { User, Wallet, DollarSign } from 'lucide-react';
 
 const Steps = () => {
   return (
-    <section className="w-full py-16 px-4 bg-[#221F24]">
+    <section className="w-full py-16 px-4" style={{ backgroundColor: '#141414' }}>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-16">
@@ -16,76 +15,74 @@ const Steps = () => {
           </p>
         </div>
 
-      {/* Step 1 */}
-        <div className="flex items-start gap-8">
+        {/* Step 1 */}
+        <div className="relative flex items-start gap-8 mb-16">
           <div className="shrink-0">
-            <div className="w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full border-2 border-[#2BA3FF] flex items-center justify-center bg-transparent">
               <span className="text-white text-4xl font-bold">1</span>
             </div>
           </div>
           
-          <div className="flex-1 pt-4">
-            <h2 className="text-2xl font-light text-gray-400 mb-4">Verify Your Identity</h2>
-            <p className="text-gray-500 leading-relaxed max-w-md">
+          <div className="flex-1 pt-2">
+            <h2 className="text-2xl font-semibold text-white mb-3">Verify Your Identity</h2>
+            <p className="text-gray-400 leading-relaxed max-w-md">
               Scan your passport with your phone. Self Protocol creates a zero-knowledge proof. Your data never leaves your device.
             </p>
           </div>
           
-          <div className="shrink-0 pt-8">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-              <User className="w-6 h-6 text-blue-500" />
+          <div className="shrink-0 pt-2 relative">
+            <div className="w-16 h-16 rounded-lg bg-[#2BA3FF]/20 flex items-center justify-center border border-[#2BA3FF]">
+              <User className="w-8 h-8 text-[#2BA3FF]" />
             </div>
+            {/* Connecting line */}
+            <div className="absolute top-20 left-1/2 w-0.5 h-24 bg-[#2BA3FF] transform -translate-x-1/2"></div>
           </div>
-          
-          <div className="flex-1 border-t border-gray-200 mt-12"></div>
         </div>
 
         {/* Step 2 */}
-        <div className="flex items-start gap-8">
-          <div className="flex-1 border-t border-gray-200 mt-12"></div>
-          
-          <div className="shrink-0 pt-8">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-blue-500" />
+        <div className="relative flex items-start gap-8 mb-16 flex-row-reverse">
+          <div className="shrink-0">
+            <div className="w-20 h-20 rounded-full border-2 border-[#2BA3FF] flex items-center justify-center bg-transparent">
+              <span className="text-white text-4xl font-bold">2</span>
             </div>
           </div>
           
-          <div className="flex-1 pt-4 text-right">
-            <h2 className="text-2xl font-light text-gray-400 mb-4">Deposit cUSD</h2>
-            <p className="text-gray-500 leading-relaxed max-w-md ml-auto">
+          <div className="flex-1 pt-2 text-right">
+            <h2 className="text-2xl font-semibold text-white mb-3">Deposit cUSD</h2>
+            <p className="text-gray-400 leading-relaxed max-w-md ml-auto">
               Start with as little as 10 cUSD. Funds automatically deploy. Interest starts immediately.
             </p>
           </div>
           
-          <div className="shrink-0">
-            <div className="w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center">
-              <span className="text-white text-4xl font-bold">2</span>
+          <div className="shrink-0 pt-2 relative">
+            <div className="w-16 h-16 rounded-lg bg-[#2BA3FF]/20 flex items-center justify-center border border-[#2BA3FF]">
+              <Wallet className="w-8 h-8 text-[#2BA3FF]" />
             </div>
+            {/* Connecting line */}
+            <div className="absolute top-20 left-1/2 w-0.5 h-24 bg-[#2BA3FF] transform -translate-x-1/2"></div>
           </div>
         </div>
 
         {/* Step 3 */}
-        <div className="flex items-start gap-8">
+        <div className="relative flex items-start gap-8">
           <div className="shrink-0">
-            <div className="w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full border-2 border-[#2BA3FF] flex items-center justify-center bg-transparent">
               <span className="text-white text-4xl font-bold">3</span>
             </div>
           </div>
           
-          <div className="flex-1 pt-4">
-            <h2 className="text-2xl font-light text-gray-400 mb-4">Watch Your Money Grow</h2>
-            <p className="text-gray-500 leading-relaxed max-w-md">
+          <div className="flex-1 pt-2">
+            <h2 className="text-2xl font-semibold text-white mb-3">Watch Your Money Grow</h2>
+            <p className="text-gray-400 leading-relaxed max-w-md">
               Check dashboard daily. Chat with AI for advice. Withdraw anytime—no fees, no lock-ups.
             </p>
           </div>
           
-          <div className="shrink-0 pt-8">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-blue-500" />
+          <div className="shrink-0 pt-2">
+            <div className="w-16 h-16 rounded-lg bg-[#2BA3FF]/20 flex items-center justify-center border border-[#2BA3FF]">
+              <DollarSign className="w-8 h-8 text-[#2BA3FF]" />
             </div>
           </div>
-          
-          <div className="flex-1 border-t border-gray-200 mt-12"></div>
         </div>
       </div>
     </section>
