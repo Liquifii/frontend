@@ -84,7 +84,7 @@ export default function HeroSection() {
               whileTap={{ scale: 0.95 }}
               className="group px-8 py-4 bg-[#2BA3FF] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
             >
-              <Link href="/dashboard" className="flex items-center gap-2">
+              <Link href="/verify/start" className="flex items-center gap-2">
                 Launch App
                 <ArrowRight className="h-5 w-5 text-white" />
               </Link>
