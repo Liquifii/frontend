@@ -31,18 +31,18 @@ const Footer = () => {
                                 <FontAwesomeIcon icon={faGithub} className="w-5 h-5" />
                             </a>
                         </div>
-                    </div>
-
+                        </div>
+                     
                     {/* Right Side - Navigation and App Downloads */}
                     <div className="flex flex-col gap-6">
-                        <div>
+                     <div>
                             <ul className="flex gap-6 text-white/90">
-                                <li><a href="#" className="hover:text-white transition-colors">Dashboard</a></li>
-                                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                                <li><a href="#" className="hover:text-white transition-colors">How it Works</a></li>
-                            </ul>
+                            <li><a href="#" className="hover:text-white transition-colors">Dashboard</a></li>
+                            <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
+                            <li><a href="#" className="hover:text-white transition-colors">How it Works</a></li>
+                        </ul>
                         </div>
-                        <div className="flex items-center gap-4">
+                             <div className="flex items-center gap-4">
                             <a href="#" aria-label="Download on the App Store" className="group inline-flex items-center gap-3 rounded-lg bg-white px-4 py-2 hover:bg-gray-100 transition">
                                 <FontAwesomeIcon icon={faApple} className="text-black w-5 h-5" />
                                 <span className="leading-tight">

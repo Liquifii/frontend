@@ -15,7 +15,7 @@ const Steps = () => {
           </p>
         </div>
 
-        {/* Step 1 */}
+      {/* Step 1 */}
         <div className="relative flex items-start gap-8 mb-16">
           <div className="shrink-0">
             <div className="w-20 h-20 rounded-full border-2 border-[#2BA3FF] flex items-center justify-center bg-transparent">
