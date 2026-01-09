@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@farcaster/miniapp-sdk": "^0.2.1",
+    "@farcaster/miniapp-wagmi-connector": "^1.1.0",
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/react-fontawesome": "^3.1.1",
@@ -21,8 +23,8 @@
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "^4.1.17",
-    "viem": "latest",
-    "wagmi": "latest"
+    "viem": "^2.44.0",
+    "wagmi": "^3.2.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
