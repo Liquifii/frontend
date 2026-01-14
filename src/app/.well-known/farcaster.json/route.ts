@@ -9,14 +9,13 @@ export async function GET() {
         },
       frame: {
         version: "1",
-        name: "Attestify",
-        iconUrl: `${appUrl}/celosplash.png`,
+        name: "LiquiFi",
+        iconUrl: `${appUrl}/liquifi_icon.png`,
         homeUrl: appUrl,
-        imageUrl: `${appUrl}/attestify.png`,
-        buttonTitle: "Launch Frame",
-        splashImageUrl: `${appUrl}/celosplash.png`,
-        splashBackgroundColor: "#f7f7f7",
-        webhookUrl: `${appUrl}/api/webhook`,
+        imageUrl: `${appUrl}/liquifi_splashscreen.png`,
+        buttonTitle: "Launch Liquifi",
+        splashImageUrl: `${appUrl}/liquifi_splashscreen.png`,
+        splashBackgroundColor: "#0E0E11",
       },
     };
   
