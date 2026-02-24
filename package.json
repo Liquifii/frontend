@@ -14,8 +14,9 @@
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/react-fontawesome": "^3.1.1",
+    "@rainbow-me/rainbowkit": "^2.2.10",
     "@tailwindcss/postcss": "^4.1.17",
-    "@tanstack/react-query": "latest",
+    "@tanstack/react-query": "^5.90.21",
     "framer-motion": "^12.23.25",
     "lucide-react": "^0.555.0",
     "next": "16.0.10",
@@ -23,8 +24,8 @@
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "^4.1.17",
-    "viem": "^2.44.0",
-    "wagmi": "^3.2.0"
+    "viem": "^2.46.2",
+    "wagmi": "^3.5.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
