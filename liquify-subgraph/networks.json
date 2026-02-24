@@ -1,0 +1,8 @@
+{
+  "celo": {
+    "AttestifyVault": {
+      "address": "0x97fc253B38E913d4aB8d30Df7b28910F065c8F1c",
+      "startBlock": 59616648
+    }
+  }
+}
