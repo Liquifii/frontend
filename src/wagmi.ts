@@ -1,20 +1,25 @@
 import { cookieStorage, createConfig, createStorage, http } from 'wagmi'
-import { mainnet, sepolia } from 'wagmi/chains'
-import { injected } from 'wagmi/connectors'
+import { celo, celoSepolia } from 'wagmi/chains'
+import { injected, walletConnect } from 'wagmi/connectors'
+import { farcasterMiniApp as miniAppConnector } from "@farcaster/miniapp-wagmi-connector";
 
 export function getConfig() {
   return createConfig({
-    chains: [mainnet, sepolia],
+    chains: [celo, celoSepolia],
     storage: createStorage({
       storage: cookieStorage,
     }),
     ssr: true,
     connectors: [
+      miniAppConnector(),
       injected({ shimDisconnect: true }),
+      walletConnect({
+        projectId: process.env.WALLETCONNECT_PROJECT_ID || '',
+      }),
     ],
     transports: {
-      [mainnet.id]: http("https://forno.celo.org"),
-      [sepolia.id]: http("https://forno.celo-sepolia.celo-testnet.org/"),
+      [celo.id]: http("https://forno.celo.org"),
+      [celoSepolia.id]: http("https://forno.celo-sepolia.celo-testnet.org/"),
     },
   })
 }

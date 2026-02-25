@@ -2,9 +2,23 @@
 
 import { motion } from 'framer-motion'
 import { Shield, Check, Monitor, Smartphone, QrCode } from 'lucide-react'
-import Navbar from '@/components/navbar'
+import Navbar from '../../components/navbar'
+import sdk from '@farcaster/miniapp-sdk';
+import { useState, useEffect } from 'react';
 
 export default function VerifyPage() {
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      sdk.actions.ready();
+    };
+    if (sdk && !isSDKLoaded) {
+      setIsSDKLoaded(true);
+      load();
+    }
+  }, [isSDKLoaded]);
+  
   return (
     <div style={{ backgroundColor: '#141414', minHeight: '100vh' }}>
       <Navbar />

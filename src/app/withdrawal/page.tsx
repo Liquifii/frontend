@@ -10,14 +10,26 @@ import {
   DollarSign,
   Coins
 } from 'lucide-react'
-import Navbar from '@/components/navbar'
+import Navbar from '../../components/navbar'
 import Link from 'next/link'
+import sdk from '@farcaster/miniapp-sdk'
 
 export default function WithdrawalPage() {
   const [amount, setAmount] = useState('')
   const [currency, setCurrency] = useState<'cusd' | 'ngn'>('cusd')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      sdk.actions.ready();
+    };
+    if (sdk && !isSDKLoaded) {
+      setIsSDKLoaded(true);
+      load();
+    }
+  }, [isSDKLoaded]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

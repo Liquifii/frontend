@@ -9,10 +9,24 @@ import {
   Eye, 
   ArrowRight
 } from 'lucide-react'
-import Navbar from '@/components/navbar'
+import Navbar from '../../components/navbar'
 import Link from 'next/link'
+import sdk from '@farcaster/miniapp-sdk'
+import { useState, useEffect } from 'react'
 
 export default function DashboardPage() {
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      sdk.actions.ready();
+    };
+    if (sdk && !isSDKLoaded) {
+      setIsSDKLoaded(true);
+      load();
+    }
+  }, [isSDKLoaded]);
+  
   return (
     <div style={{ backgroundColor: '#0E0E11', minHeight: '100vh' }}>
       <Navbar />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Home, 
@@ -11,14 +11,26 @@ import {
   DollarSign,
   Coins
 } from 'lucide-react'
-import Navbar from '@/components/navbar'
+import Navbar from '../../components/navbar'
 import Link from 'next/link'
+import sdk from '@farcaster/miniapp-sdk'
 
 export default function DepositPage() {
   const [selectedTab, setSelectedTab] = useState<'fiat' | 'cusd'>('fiat')
   const [amount, setAmount] = useState('')
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [balanceHidden, setBalanceHidden] = useState(false)
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      sdk.actions.ready();
+    };
+    if (sdk && !isSDKLoaded) {
+      setIsSDKLoaded(true);
+      load();
+    }
+  }, [isSDKLoaded]);
 
   // Sample balance history data
   const balanceHistory = [
