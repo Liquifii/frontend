@@ -1,5 +1,5 @@
 'use client'
-
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Home, 
@@ -12,21 +12,124 @@ import {
 import Navbar from '../../components/navbar'
 import Link from 'next/link'
 import sdk from '@farcaster/miniapp-sdk'
-import { useState, useEffect } from 'react'
+import { useQuery } from '@apollo/client/react'
+import { gql } from '@apollo/client'
+import { useAccount } from 'wagmi'
 
 export default function DashboardPage() {
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false)
+  const { address } = useAccount()
+
+  console.log("addy", address)
+
+  const GET_DEPOSITS = gql`
+    query GetDeposits($user: Bytes!) {
+      depositeds(where: { user: $user }) {
+        user
+        shares
+        blockTimestamp
+        assets
+        transactionHash
+        id
+      }
+    }
+  `
+
+  const GET_WITHDRAWNS = gql`
+    query GetWithdrawns($user: Bytes!) {
+      withdrawns(where: { user: $user }) {
+        user
+        shares
+        blockTimestamp
+        assets
+        transactionHash
+        id
+      }
+    }
+  `
+
+  // Define types
+  interface Deposited {
+    user: string
+    shares: string
+    blockTimestamp: string
+    assets: string
+    transactionHash: string
+    id: string
+  }
+
+  interface Withdrawn {
+    user: string
+    shares: string
+    blockTimestamp: string
+    assets: string
+    transactionHash: string
+    id: string
+  }
+
+  interface DepositedData {
+    depositeds?: Deposited[]
+  }
+
+  interface WithdrawalData {
+    withdrawns?: Withdrawn[]
+  }
+
+  const {
+    data: depositedData,
+    loading: depositedLoading,
+    error: depositedError
+  } = useQuery<DepositedData>(GET_DEPOSITS, {
+    variables: { user: address?.toLowerCase() },
+    skip: !address
+  })
+
+  const {
+    data: withdrawalData,
+    loading: withdrawalLoading,
+    error: withdrawalError
+  } = useQuery<WithdrawalData>(GET_WITHDRAWNS, {
+    variables: { user: address?.toLowerCase() },
+    skip: !address
+  })
 
   useEffect(() => {
     const load = async () => {
       sdk.actions.ready();
     };
     if (sdk && !isSDKLoaded) {
-      setIsSDKLoaded(true);
-      load();
+      setIsSDKLoaded(true)
+      load()
     }
-  }, [isSDKLoaded]);
-  
+  }, [isSDKLoaded])
+
+  const isLoading = depositedLoading || withdrawalLoading
+  const hasError = depositedError || withdrawalError
+
+  const transactions =
+    address && depositedData && withdrawalData
+      ? [
+          ...(depositedData.depositeds ?? []).map((d) => ({
+            type: 'Deposit',
+            amount: `+${d.assets}`,
+            date: new Date(Number(d.blockTimestamp) * 1000).toLocaleDateString(),
+            status: 'Complete',
+            statusColor: 'text-green-400',
+            id: d.id
+          })),
+          ...(withdrawalData.withdrawns ?? []).map((w) => ({
+            type: 'Withdrawal',
+            amount: `-${w.assets}`,
+            date: new Date(Number(w.blockTimestamp) * 1000).toLocaleDateString(),
+            status: 'Complete',
+            statusColor: 'text-green-400',
+            id: w.id
+          }))
+        ].sort(
+          (a, b) =>
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
+      : []
   return (
     <div style={{ backgroundColor: '#0E0E11', minHeight: '100vh' }}>
       <Navbar />
@@ -114,33 +217,65 @@ export default function DashboardPage() {
             <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6">
               <h3 className="text-white font-semibold mb-4">Transaction History</h3>
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="text-left text-white/70 text-sm font-medium py-3 px-4">Type</th>
-                      <th className="text-left text-white/70 text-sm font-medium py-3 px-4">Amount</th>
-                      <th className="text-left text-white/70 text-sm font-medium py-3 px-4">Date</th>
-                      <th className="text-left text-white/70 text-sm font-medium py-3 px-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { type: 'Deposit', amount: '+$20.00', date: 'Nov 21, 2025', status: 'Complete', statusColor: 'text-green-400' },
-                      { type: 'Yield', amount: '+$0.0078', date: 'Nov 21, 2025', status: 'Complete', statusColor: 'text-green-400' },
-                      { type: 'Yield', amount: '+$0.0096', date: 'Nov 22, 2025', status: 'Complete', statusColor: 'text-green-400' },
-                      { type: 'Deposit', amount: '+$14.00', date: 'Nov 22, 2025', status: 'Complete', statusColor: 'text-green-400' },
-                      { type: 'Withdrawal', amount: '-$30.00', date: 'Nov 23, 2025', status: 'Complete', statusColor: 'text-green-400' },
-                      { type: 'Yield', amount: '+$0.0096', date: 'Nov 23, 2025', status: 'Pending', statusColor: 'text-orange-400' },
-                    ].map((transaction, index) => (
-                      <tr key={index} className="border-b border-white/5">
-                        <td className="text-white py-3 px-4">{transaction.type}</td>
-                        <td className="text-white py-3 px-4">{transaction.amount}</td>
-                        <td className="text-white/70 py-3 px-4">{transaction.date}</td>
-                        <td className={`py-3 px-4 ${transaction.statusColor}`}>{transaction.status}</td>
+                {isLoading ? (
+                  <p className="text-white/70 text-sm px-4 py-3">
+                    Loading transactions...
+                  </p>
+                ) : hasError ? (
+                  <p className="text-red-400 text-sm px-4 py-3">
+                    Failed to load transactions.
+                  </p>
+                ) : !address ? (
+                  <p className="text-white/70 text-sm px-4 py-3">
+                    Connect your wallet to see your transaction history.
+                  </p>
+                ) : transactions.length === 0 ? (
+                  <p className="text-white/70 text-sm px-4 py-3">
+                    No transactions found for this wallet.
+                  </p>
+                ) : (
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left text-white/70 text-sm font-medium py-3 px-4">
+                          Type
+                        </th>
+                        <th className="text-left text-white/70 text-sm font-medium py-3 px-4">
+                          Amount
+                        </th>
+                        <th className="text-left text-white/70 text-sm font-medium py-3 px-4">
+                          Date
+                        </th>
+                        <th className="text-left text-white/70 text-sm font-medium py-3 px-4">
+                          Status
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {transactions.map((transaction) => (
+                        <tr
+                          key={transaction.id}
+                          className="border-b border-white/5"
+                        >
+                          <td className="text-white py-3 px-4">
+                            {transaction.type}
+                          </td>
+                          <td className="text-white py-3 px-4">
+                            {transaction.amount}
+                          </td>
+                          <td className="text-white/70 py-3 px-4">
+                            {transaction.date}
+                          </td>
+                          <td
+                            className={`py-3 px-4 ${transaction.statusColor}`}
+                          >
+                            {transaction.status}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
 

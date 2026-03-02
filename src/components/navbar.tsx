@@ -1,16 +1,25 @@
-import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Sun } from 'lucide-react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useAccount, useConnect, useConnectors, useDisconnect } from 'wagmi'
 
 const Navbar = () => {
   const { isConnected, address } = useAccount()
-  const { connect, connectors, status: connectStatus, error } = useConnect()
+  const { connect, status: connectStatus } = useConnect()
+  const connectors = useConnectors()
   const { disconnect } = useDisconnect()
 
+  const isFarcaster = typeof window !== 'undefined' && 
+    (window.location !== window.parent.location || !!window?.frames?.length)
+
   const onConnect = () => {
-    if (connectors?.[0]) connect({ connector: connectors[0] })
+    // On Farcaster, miniAppConnector is index 0; on web, fall back to injected or WalletConnect
+    const preferred = isFarcaster
+      ? connectors.find(c => c.id === 'farcasterMiniApp')
+      : connectors.find(c => c.id === 'injected') ?? connectors.find(c => c.id === 'walletConnect')
+
+    const connector = preferred ?? connectors[0]
+    if (connector) connect({ connector })
   }
 
   return (
@@ -57,6 +66,3 @@ const Navbar = () => {
 }
 
 export default Navbar
-
-
-

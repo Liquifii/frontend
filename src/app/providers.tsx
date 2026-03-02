@@ -1,5 +1,5 @@
 'use client'
-
+import { ApolloWrapper } from "./ApolloWrapper";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type ReactNode, useState } from 'react'
 import { type State, WagmiProvider } from 'wagmi'
@@ -14,10 +14,12 @@ export function Providers(props: {
   const [queryClient] = useState(() => new QueryClient())
 
   return (
-    <WagmiProvider config={config} initialState={props.initialState}>
-      <QueryClientProvider client={queryClient}>
-        {props.children}
-      </QueryClientProvider>
-    </WagmiProvider>
+    <ApolloWrapper>
+      <WagmiProvider config={config} initialState={props.initialState}>
+        <QueryClientProvider client={queryClient}>
+          {props.children}
+        </QueryClientProvider>
+      </WagmiProvider>
+    </ApolloWrapper>
   )
 }

@@ -9,22 +9,28 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@apollo/client": "^4.1.6",
+    "@apollo/client-integration-nextjs": "^0.14.4",
+    "@apollo/server": "^5.4.0",
     "@farcaster/miniapp-sdk": "^0.2.1",
     "@farcaster/miniapp-wagmi-connector": "^1.1.0",
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/react-fontawesome": "^3.1.1",
+    "@rainbow-me/rainbowkit": "^2.2.10",
     "@tailwindcss/postcss": "^4.1.17",
-    "@tanstack/react-query": "latest",
+    "@tanstack/react-query": "^5.90.21",
     "framer-motion": "^12.23.25",
+    "graphql": "^16.13.0",
     "lucide-react": "^0.555.0",
     "next": "16.0.10",
     "postcss": "^8.5.6",
     "react": "latest",
     "react-dom": "latest",
+    "rxjs": "^7.8.1",
     "tailwindcss": "^4.1.17",
-    "viem": "^2.44.0",
-    "wagmi": "^3.2.0"
+    "viem": "^2.46.2",
+    "wagmi": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
@@ -32,5 +38,6 @@
     "@types/react-dom": "latest",
     "@wagmi/cli": "latest",
     "typescript": "latest"
-  }
+  },
+  "packageManager": "yarn@3.6.1+sha512.de524adec81a6c3d7a26d936d439d2832e351cdfc5728f9d91f3fc85dd20b04391c038e9b4ecab11cae2b0dd9f0d55fd355af766bc5c1a7f8d25d96bb2a0b2ca"
 }
