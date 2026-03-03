@@ -1,25 +1,21 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Sun } from 'lucide-react'
-import { useAccount, useConnect, useConnectors, useDisconnect } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useConnectors } from 'wagmi'
 
 const Navbar = () => {
   const { isConnected, address } = useAccount()
-  const { connect, status: connectStatus } = useConnect()
-  const connectors = useConnectors()
+  const { connect, isPending } = useConnect()
   const { disconnect } = useDisconnect()
+  const connectors = useConnectors()
 
-  const isFarcaster = typeof window !== 'undefined' && 
-    (window.location !== window.parent.location || !!window?.frames?.length)
-
-  const onConnect = () => {
-    // On Farcaster, miniAppConnector is index 0; on web, fall back to injected or WalletConnect
-    const preferred = isFarcaster
-      ? connectors.find(c => c.id === 'farcasterMiniApp')
-      : connectors.find(c => c.id === 'injected') ?? connectors.find(c => c.id === 'walletConnect')
-
-    const connector = preferred ?? connectors[0]
-    if (connector) connect({ connector })
+  // Handle wallet connection - Farcaster handles wallet selection
+  const handleConnect = () => {
+    if (connectors.length > 0) {
+      // Use the first available connector (Farcaster connector)
+      // Farcaster will handle showing wallet selection if needed
+      connect({ connector: connectors[0] })
+    }
   }
 
   return (
@@ -52,11 +48,12 @@ const Navbar = () => {
             </div>
           ) : (
             <button
-              onClick={onConnect}
-              disabled={connectStatus === 'pending'}
-              className="border border-[#2BA3FF] hover:bg-[#2BA3FF]/10 disabled:opacity-60 text-white px-4 py-2 rounded-md transition-colors"
+              type="button"
+              onClick={handleConnect}
+              disabled={isPending || connectors.length === 0}
+              className="border border-[#2BA3FF] hover:bg-[#2BA3FF]/10 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md transition-colors"
             >
-              {connectStatus === 'pending' ? 'Connecting…' : 'Connect Wallet'}
+              {isPending ? 'Connecting...' : 'Connect'}
             </button>
           )}
         </div>
