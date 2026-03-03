@@ -1,16 +1,21 @@
-import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Sun } from 'lucide-react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useConnectors } from 'wagmi'
 
 const Navbar = () => {
   const { isConnected, address } = useAccount()
-  const { connect, connectors, status: connectStatus, error } = useConnect()
+  const { connect, isPending } = useConnect()
   const { disconnect } = useDisconnect()
+  const connectors = useConnectors()
 
-  const onConnect = () => {
-    if (connectors?.[0]) connect({ connector: connectors[0] })
+  // Handle wallet connection - Farcaster handles wallet selection
+  const handleConnect = () => {
+    if (connectors.length > 0) {
+      // Use the first available connector (Farcaster connector)
+      // Farcaster will handle showing wallet selection if needed
+      connect({ connector: connectors[0] })
+    }
   }
 
   return (
@@ -43,11 +48,12 @@ const Navbar = () => {
             </div>
           ) : (
             <button
-              onClick={onConnect}
-              disabled={connectStatus === 'pending'}
-              className="border border-[#2BA3FF] hover:bg-[#2BA3FF]/10 disabled:opacity-60 text-white px-4 py-2 rounded-md transition-colors"
+              type="button"
+              onClick={handleConnect}
+              disabled={isPending || connectors.length === 0}
+              className="border border-[#2BA3FF] hover:bg-[#2BA3FF]/10 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md transition-colors"
             >
-              {connectStatus === 'pending' ? 'Connecting…' : 'Connect Wallet'}
+              {isPending ? 'Connecting...' : 'Connect'}
             </button>
           )}
         </div>
@@ -57,6 +63,3 @@ const Navbar = () => {
 }
 
 export default Navbar
-
-
-
