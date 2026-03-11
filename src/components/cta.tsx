@@ -73,7 +73,7 @@ export default function CTASection() {
               whileTap={{ scale: 0.95 }}
               className="group px-8 py-4 bg-white border border-gray-200 text-black rounded-xl font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 inline-flex items-center gap-2"
             >
-              <Link href="/verify/start" className="flex items-center gap-2 text-black">
+              <Link href="/dashboard" className="flex items-center gap-2 text-black">
                 Launch App
                   <ArrowRight className="h-5 w-5 text-black" />
               </Link>
