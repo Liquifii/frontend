@@ -20,9 +20,6 @@ export default function DashboardPage() {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false)
   const { address } = useAccount()
 
-  // Hardcoded address to use instead of connected address
-  const hardcodedAddress = '0xa60c363f9282adf1868e10234924bfb9e8a3c9e9' // all lowercase for The Graph
-
   const GET_DEPOSITS = gql`
     query GetDeposits($user: Bytes!) {
       depositeds(where: { user: $user }) {
@@ -76,14 +73,13 @@ export default function DashboardPage() {
     withdrawns?: Withdrawn[]
   }
 
-  // Always fetch for the hardcoded address
   const {
     data: depositedData,
     loading: depositedLoading,
     error: depositedError
   } = useQuery<DepositedData>(GET_DEPOSITS, {
-    variables: { user: hardcodedAddress },
-    skip: false
+    variables: { user: address?.toLowerCase() },
+    skip: !address
   })
 
   const {
@@ -91,8 +87,8 @@ export default function DashboardPage() {
     loading: withdrawalLoading,
     error: withdrawalError
   } = useQuery<WithdrawalData>(GET_WITHDRAWNS, {
-    variables: { user: hardcodedAddress },
-    skip: false
+    variables: { user: address?.toLowerCase() },
+    skip: !address
   })
 
   useEffect(() => {
@@ -108,9 +104,8 @@ export default function DashboardPage() {
   const isLoading = depositedLoading || withdrawalLoading
   const hasError = depositedError || withdrawalError
 
-  // Always show transactions for the hardcoded address
   const transactions =
-    depositedData && withdrawalData
+    address && depositedData && withdrawalData
       ? [
           ...(depositedData.depositeds ?? []).map((d) => ({
             type: 'Deposit',
@@ -133,7 +128,6 @@ export default function DashboardPage() {
             new Date(b.date).getTime() - new Date(a.date).getTime()
         )
       : []
-
   return (
     <div style={{ backgroundColor: '#0E0E11', minHeight: '100vh' }}>
       <Navbar />
@@ -228,6 +222,10 @@ export default function DashboardPage() {
                 ) : hasError ? (
                   <p className="text-red-400 text-sm px-4 py-3">
                     Failed to load transactions.
+                  </p>
+                ) : !address ? (
+                  <p className="text-white/70 text-sm px-4 py-3">
+                    Connect your wallet to see your transaction history.
                   </p>
                 ) : transactions.length === 0 ? (
                   <p className="text-white/70 text-sm px-4 py-3">

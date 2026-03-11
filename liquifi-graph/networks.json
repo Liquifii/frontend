@@ -1,8 +1,0 @@
-{
-  "celo": {
-    "TestProxy": {
-      "address": "0x5E12835Dd11A7D35E0D5E49E2c66b9235C148243",
-      "startBlock": 59616653
-    }
-  }
-}
