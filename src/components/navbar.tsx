@@ -2,15 +2,21 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Sun } from 'lucide-react'
 import { useAccount, useConnect, useConnectors, useDisconnect } from 'wagmi'
+import { useState, useEffect } from 'react'
 
 const Navbar = () => {
   const { isConnected, address } = useAccount()
   const { connect, status: connectStatus } = useConnect()
   const connectors = useConnectors()
   const { disconnect } = useDisconnect()
+  const [isFarcaster, setIsFarcaster] = useState(false)
 
-  const isFarcaster = typeof window !== 'undefined' && 
-    (window.location !== window.parent.location || !!window?.frames?.length)
+  // Only check on client to avoid hydration mismatch
+  useEffect(() => {
+    setIsFarcaster(
+      window.location !== window.parent.location || !!window?.frames?.length
+    )
+  }, [])
 
   const onConnect = () => {
     // On Farcaster, miniAppConnector is index 0; on web, fall back to injected or WalletConnect
@@ -23,7 +29,7 @@ const Navbar = () => {
   }
 
   return (
-    <nav className="w-full text-white bg-nav-gradient">
+    <nav className="sticky top-0 z-50 w-full text-white bg-nav-gradient backdrop-blur-md bg-opacity-95 border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <Image 

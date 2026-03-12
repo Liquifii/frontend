@@ -13,7 +13,11 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Menu,
+  X
 } from 'lucide-react'
 import Navbar from '../../components/navbar'
 import Link from 'next/link'
@@ -79,6 +83,7 @@ export default function DepositPage() {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false)
   const [txStatus, setTxStatus] = useState<'idle' | 'approving' | 'depositing' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string>('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const { address, isConnected } = useAccount()
 
@@ -603,21 +608,63 @@ export default function DepositPage() {
       <Navbar />
 
       <div className="flex">
-        {/* Left Sidebar - Hidden on mobile */}
-        <aside className="hidden lg:block w-64 border-r border-white/10 min-h-[calc(100vh-64px)] p-4" style={{ backgroundColor: '#0E0E11' }}>
-          <nav className="space-y-4">
-            <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+        {/* Mobile Hamburger Button */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="lg:hidden fixed top-20 left-4 z-50 p-2 bg-[#1a1a1a] border border-white/10 rounded-lg text-white hover:bg-white/5 transition-colors"
+          aria-label="Toggle sidebar"
+        >
+          {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+
+        {/* Overlay for mobile */}
+        {sidebarOpen && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* Left Sidebar */}
+        <aside
+          className={`fixed lg:static inset-y-0 left-0 z-40 w-64 border-r border-white/10 min-h-[calc(100vh-64px)] p-4 transform transition-transform duration-300 ease-in-out -translate-x-full lg:translate-x-0 ${
+            sidebarOpen ? '!translate-x-0' : ''
+          }`}
+          style={{ backgroundColor: '#0E0E11' }}
+        >
+          <nav className="space-y-2 pt-12 lg:pt-0">
+            <Link 
+              href="/dashboard" 
+              className="flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              onClick={() => setSidebarOpen(false)}
+            >
               <Home className="w-5 h-5" />
               <span>Home</span>
             </Link>
-            <Link href="/ai-assistant" className="flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+            <Link 
+              href="/ai-assistant" 
+              className="flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              onClick={() => setSidebarOpen(false)}
+            >
               <Brain className="w-5 h-5" />
               <span>AI Assistant</span>
             </Link>
-            <a href="#" className="flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
-              <Settings className="w-5 h-5" />
-              <span>Strategy</span>
-            </a>
+            <Link 
+              href="/deposit" 
+              className="flex items-center gap-3 px-4 py-3 bg-[#2BA3FF]/20 text-[#2BA3FF] rounded-lg font-medium"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <ArrowDownToLine className="w-5 h-5" />
+              <span>Deposit</span>
+            </Link>
+            <Link 
+              href="/withdrawal" 
+              className="flex items-center gap-3 px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <ArrowUpFromLine className="w-5 h-5" />
+              <span>Withdrawal</span>
+            </Link>
           </nav>
         </aside>
 

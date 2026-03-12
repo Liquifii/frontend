@@ -17,9 +17,14 @@ export function getConfig() {
         : [
             miniAppConnector(),
             injected({ shimDisconnect: true }),
-            walletConnect({
-              projectId: process.env.WALLETCONNECT_PROJECT_ID || '',
-            }),
+            // Only add WalletConnect if project ID is configured
+            ...(process.env.WALLETCONNECT_PROJECT_ID
+              ? [
+                  walletConnect({
+                    projectId: process.env.WALLETCONNECT_PROJECT_ID,
+                  }),
+                ]
+              : []),
           ],
     transports: {
       [celo.id]: http(),
