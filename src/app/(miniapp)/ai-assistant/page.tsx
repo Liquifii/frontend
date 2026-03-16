@@ -153,6 +153,7 @@ export default function AIAssistantPage() {
   const [vaultHash, setVaultHash] = useState<`0x${string}` | undefined>()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const hasUserInteracted = useRef(false)
   
   // SelfClaw trust verification
   const [trustData, setTrustData] = useState<{
@@ -185,9 +186,11 @@ export default function AIAssistantPage() {
     }
   }, [txHash, transactionStatus])
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive, but only after the user has interacted
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (hasUserInteracted.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
   // Fetch SelfClaw trust status on mount and update welcome message
@@ -469,6 +472,9 @@ export default function AIAssistantPage() {
       content: input.trim(),
       timestamp: new Date(),
     }
+
+    // Mark that the user has interacted so we can start auto-scrolling
+    hasUserInteracted.current = true
 
     setMessages((prev) => [...prev, userMessage])
     const messageContent = input.trim()
