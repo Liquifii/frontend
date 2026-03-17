@@ -27,6 +27,7 @@ import { AttestifyVaultContract, CUSD_ADDRESS } from '../abi'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import Navbar from '../../components/navbar'
+import OffRampForm from '../../components/offramp-form'
 
 // ERC20 ABI for USDm token operations
 const ERC20_ABI = [
@@ -566,7 +567,7 @@ export default function WithdrawalPage() {
                       ) : (
                         <>
                           <span className="text-lg">₦</span>
-                          <span>NGN</span>
+                          <span>Fiat (Cash Out)</span>
                         </>
                       )}
                     </div>
@@ -596,66 +597,70 @@ export default function WithdrawalPage() {
                         }`}
                       >
                         <span className="text-lg">₦</span>
-                        <span>NGN</span>
+                        <span>Fiat (Cash Out)</span>
                       </button>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Amount Input */}
-              <div className="mb-6">
-                <label className="block text-white/70 text-sm mb-2">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg">
-                    {currency === 'usdm' ? '$' : '₦'}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        setAmount(value)
-                        setErrorMessage('')
-                      }
-                    }}
-                    placeholder={currency === 'usdm' ? 'Enter amount in USDm' : 'Enter amount in NGN'}
-                    className="w-full pl-10 pr-20 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
-                  />
-                  {isConnected && currency === 'usdm' && userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint' && userVaultBalance > BigInt(0) && (
-                    <button
-                      type="button"
-                      onClick={handleMaxClick}
-                      disabled={txStatus === 'withdrawing' || txStatus === 'transferring'}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-semibold bg-[#2BA3FF]/20 text-[#2BA3FF] rounded-md hover:bg-[#2BA3FF]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Max
-                    </button>
-                  )}
-                </div>
-                {amount && withdrawalAmount > BigInt(0) && (
-                  <p className="text-xs text-white/50 mt-1">
-                    ≈ {formatBalance(withdrawalAmount)} USDm
-                  </p>
-                )}
-              </div>
+              {/* Fiat Tab Content (Off-ramp) */}
+              {currency === 'ngn' ? (
+                <OffRampForm />
+              ) : (
+                <>
+                  {/* Amount Input */}
+                  <div className="mb-6">
+                    <label className="block text-white/70 text-sm mb-2">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg">
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={amount}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setAmount(value)
+                            setErrorMessage('')
+                          }
+                        }}
+                        placeholder="Enter amount in USDm"
+                        className="w-full pl-10 pr-20 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
+                      />
+                      {isConnected && userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint' && userVaultBalance > BigInt(0) && (
+                        <button
+                          type="button"
+                          onClick={handleMaxClick}
+                          disabled={txStatus === 'withdrawing' || txStatus === 'transferring'}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-semibold bg-[#2BA3FF]/20 text-[#2BA3FF] rounded-md hover:bg-[#2BA3FF]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Max
+                        </button>
+                      )}
+                    </div>
+                    {amount && withdrawalAmount > BigInt(0) && (
+                      <p className="text-xs text-white/50 mt-1">
+                        ≈ {formatBalance(withdrawalAmount)} USDm
+                      </p>
+                    )}
+                  </div>
 
-              {/* Withdrawal Range */}
-              <div className="mb-6">
-                <p className="text-white/60 text-sm">
-                  Min: <span className="text-white">
-                    {currency === 'usdm' ? '$1' : '₦1,000'}
-                  </span> | Max: <span className="text-white">
-                    {currency === 'usdm' ? '$100,000' : '₦5,000,000'}
-                  </span>
-                </p>
-              </div>
+                  {/* Withdrawal Range */}
+                  <div className="mb-6">
+                    <p className="text-white/60 text-sm">
+                      Min: <span className="text-white">$1</span> | Max: <span className="text-white">$100,000</span>
+                    </p>
+                  </div>
+                </>
+              )}
 
-              {/* Optional: Withdraw to External Address */}
+              {/* Optional: Withdraw to External Address - Only for USDm */}
+              {currency === 'usdm' && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-white/70 text-sm">Withdraw to (optional)</label>
@@ -707,6 +712,7 @@ export default function WithdrawalPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Withdrawal Details */}
               <div className="mb-6 space-y-3">
@@ -759,7 +765,7 @@ export default function WithdrawalPage() {
                 )}
               </button>
 
-              {!isConnected && (
+              {!isConnected && currency === 'usdm' && (
                 <p className="text-center text-white/50 text-sm mt-4">
                   Please connect your wallet to withdraw
                 </p>

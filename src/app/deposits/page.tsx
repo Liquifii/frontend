@@ -27,6 +27,7 @@ import { AttestifyVaultContract, CUSD_ADDRESS } from '../abi'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import Navbar from '../../components/navbar'
+import OnRampForm from '../../components/onramp-form'
 
 // ERC20 ABI for USDm token operations
 const ERC20_ABI = [
@@ -819,9 +820,6 @@ export default function DepositPage() {
                     >
                       <DollarSign className="w-4 h-4" />
                       Fiat
-                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded">
-                        Coming Soon
-                      </span>
                     </button>
                     <button
                       onClick={() => setSelectedTab('usdm')}
@@ -836,178 +834,173 @@ export default function DepositPage() {
                     </button>
                   </div>
 
-                  {/* Amount Input */}
-                  <div className="mb-6">
-                    <label className="block text-white/70 text-sm mb-2">Amount</label>
-                    {selectedTab === 'fiat' ? (
-                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                        <p className="text-yellow-400 text-sm flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4" />
-                          Fiat offramping is coming soon! Please use USDm for now.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg">
-                          $
-                        </span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={amount}
-                          onChange={(e) => {
-                            const value = e.target.value
-                            // Allow empty, numbers, and one decimal point
-                            if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                              setAmount(value)
-                              setErrorMessage('')
-                            }
-                          }}
-                          placeholder="Enter amount in USDm"
-                          className="w-full pl-10 pr-20 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors"
-                          disabled={!isConnected || txStatus === 'approving' || txStatus === 'depositing'}
-                        />
-                        {/* Max Button - Only show for USDm tab */}
-                        {selectedTab === 'usdm' && isConnected && usdmBalance !== undefined && typeof usdmBalance === 'bigint' && usdmBalance > 0n && (
-                          <button
-                            type="button"
-                            onClick={handleMaxClick}
-                            disabled={txStatus === 'approving' || txStatus === 'depositing'}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-medium text-[#2BA3FF] hover:text-[#1a8fdb] bg-[#2BA3FF]/10 hover:bg-[#2BA3FF]/20 border border-[#2BA3FF]/30 hover:border-[#2BA3FF]/50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Max
-                          </button>
+                  {/* Fiat Tab Content */}
+                  {selectedTab === 'fiat' ? (
+                    <OnRampForm />
+                  ) : (
+                    <>
+                      {/* Amount Input */}
+                      <div className="mb-6">
+                        <label className="block text-white/70 text-sm mb-2">Amount</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg">
+                            $
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={amount}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              // Allow empty, numbers, and one decimal point
+                              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                setAmount(value)
+                                setErrorMessage('')
+                              }
+                            }}
+                            placeholder="Enter amount in USDm"
+                            className="w-full pl-10 pr-20 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors"
+                            disabled={!isConnected || txStatus === 'approving' || txStatus === 'depositing'}
+                          />
+                          {/* Max Button - Only show for USDm tab */}
+                          {selectedTab === 'usdm' && isConnected && usdmBalance !== undefined && typeof usdmBalance === 'bigint' && usdmBalance > 0n && (
+                            <button
+                              type="button"
+                              onClick={handleMaxClick}
+                              disabled={txStatus === 'approving' || txStatus === 'depositing'}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-medium text-[#2BA3FF] hover:text-[#1a8fdb] bg-[#2BA3FF]/10 hover:bg-[#2BA3FF]/20 border border-[#2BA3FF]/30 hover:border-[#2BA3FF]/50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Max
+                            </button>
+                          )}
+                        </div>
+                        {amount && depositAmount > BigInt(0) && (
+                          <p className="text-xs text-white/50 mt-1">
+                            ≈ {formatAmount(depositAmount)} USDm
+                          </p>
+                        )}
+                        {/* Real-time validation feedback */}
+                        {validationError && (
+                          <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            {validationError}
+                          </p>
                         )}
                       </div>
-                    )}
-                    {amount && depositAmount > BigInt(0) && (
-                      <p className="text-xs text-white/50 mt-1">
-                        ≈ {formatAmount(depositAmount)} USDm
-                      </p>
-                    )}
-                    {/* Real-time validation feedback */}
-                    {validationError && (
-                      <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {validationError}
-                      </p>
-                    )}
-                  </div>
 
-                  {/* Deposit Range */}
-                  <div className="mb-6">
-                    <p className="text-white/60 text-sm">
-                      Deposit Range: <span className="text-white">
-                        {selectedTab === 'fiat' 
-                          ? 'Min: ₦1,000 | Max: ₦5,000,000'
-                          : 'Min: 1 USDm | Max: 100,000 USDm'
-                        }
-                      </span>
-                    </p>
-                    {selectedTab === 'usdm' && isConnected && usdmBalance !== undefined && (
-                      <p className="text-white/50 text-xs mt-1">
-                        Available: {formatAmount(usdmBalance)} USDm
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Error Message */}
-                  {errorMessage && (
-                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
-                      <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                      <p className="text-red-400 text-sm">{errorMessage}</p>
-                    </div>
-                  )}
-
-                  {/* Success Message */}
-                  {txStatus === 'success' && (
-                    <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
-                      <p className="text-green-400 text-sm">Deposit successful!</p>
-                    </div>
-                  )}
-
-                  {/* Connection Status */}
-                  {!isConnected && (
-                    <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
-                      <p className="text-yellow-400 text-sm">Please connect your wallet to deposit</p>
-                    </div>
-                  )}
-
-                  {/* Balance Display - Always show when connected */}
-                  {isConnected && (
-                    <div className="mb-4">
-                      {usdmBalance === undefined ? (
-                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2">
-                          <Loader2 className="w-5 h-5 text-yellow-400 flex-shrink-0 animate-spin" />
-                          <p className="text-yellow-400 text-sm">Loading balance...</p>
-                        </div>
-                      ) : depositAmount > BigInt(0) && usdmBalance < depositAmount ? (
-                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
-                          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                          <p className="text-red-400 text-sm break-words">
-                            Insufficient balance. You have {formatAmount(usdmBalance)} USDm
+                      {/* Deposit Range */}
+                      <div className="mb-6">
+                        <p className="text-white/60 text-sm">
+                          Deposit Range: <span className="text-white">
+                            Min: 1 USDm | Max: 100,000 USDm
+                          </span>
+                        </p>
+                        {isConnected && usdmBalance !== undefined && (
+                          <p className="text-white/50 text-xs mt-1">
+                            Available: {formatAmount(usdmBalance)} USDm
                           </p>
+                        )}
+                      </div>
+
+                      {/* Error Message */}
+                      {errorMessage && (
+                        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
+                          <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                          <p className="text-red-400 text-sm">{errorMessage}</p>
                         </div>
-                      ) : (
-                        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      )}
+
+                      {/* Success Message */}
+                      {txStatus === 'success' && (
+                        <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+                          <p className="text-green-400 text-sm">Deposit successful!</p>
+                        </div>
+                      )}
+
+                      {/* Connection Status */}
+                      {!isConnected && (
+                        <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2">
+                          <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+                          <p className="text-yellow-400 text-sm">Please connect your wallet to deposit</p>
+                        </div>
+                      )}
+
+                      {/* Balance Display - Always show when connected */}
+                      {isConnected && (
+                        <div className="mb-4">
+                          {usdmBalance === undefined ? (
+                            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2">
+                              <Loader2 className="w-5 h-5 text-yellow-400 flex-shrink-0 animate-spin" />
+                              <p className="text-yellow-400 text-sm">Loading balance...</p>
+                            </div>
+                          ) : depositAmount > BigInt(0) && usdmBalance < depositAmount ? (
+                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
+                              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                              <p className="text-red-400 text-sm break-words">
+                                Insufficient balance. You have {formatAmount(usdmBalance)} USDm
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                              <p className="text-blue-400 text-sm break-words">
+                                Wallet Balance: {formatAmount(usdmBalance)} USDm
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Allowance Status */}
+                      {isConnected && depositAmount > BigInt(0) && allowance !== undefined && (
+                        <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                           <p className="text-blue-400 text-sm break-words">
-                            Wallet Balance: {formatAmount(usdmBalance)} USDm
+                            {needsApproval ? (
+                              <>⚠️ Approval needed: {formatAmount(allowance as bigint)} USDm approved, need {formatAmount(depositAmount)} USDm</>
+                            ) : (
+                              <>✅ Sufficient allowance: {formatAmount(allowance as bigint)} USDm approved</>
+                            )}
                           </p>
                         </div>
                       )}
-                    </div>
-                  )}
 
-                  {/* Allowance Status */}
-                  {isConnected && depositAmount > BigInt(0) && allowance !== undefined && (
-                    <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                      <p className="text-blue-400 text-sm break-words">
-                        {needsApproval ? (
-                          <>⚠️ Approval needed: {formatAmount(allowance as bigint)} USDm approved, need {formatAmount(depositAmount)} USDm</>
+                      {/* Proceed Button */}
+                      <button
+                        onClick={handleProceed}
+                        disabled={
+                          !isConnected ||
+                          !amount ||
+                          depositAmount === BigInt(0) ||
+                          (usdmBalance !== undefined && typeof usdmBalance === 'bigint' && usdmBalance < depositAmount) ||
+                          txStatus === 'approving' ||
+                          txStatus === 'depositing' ||
+                          isWaitingApproval ||
+                          isWaitingDeposit
+                        }
+                        className="w-full py-3 bg-[#2BA3FF] text-white rounded-lg font-semibold hover:bg-[#1a8fdb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {txStatus === 'approving' || isApproving || isWaitingApproval ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Approving...
+                          </>
+                        ) : txStatus === 'depositing' || isDepositing || isWaitingDeposit ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Depositing...
+                          </>
+                        ) : needsApproval ? (
+                          <>
+                            Approve USDm
+                            <AlertCircle className="w-4 h-4" />
+                          </>
                         ) : (
-                          <>✅ Sufficient allowance: {formatAmount(allowance as bigint)} USDm approved</>
+                          'Deposit'
                         )}
-                      </p>
-                    </div>
+                      </button>
+                    </>
                   )}
-
-                  {/* Proceed Button */}
-                  <button
-                    onClick={handleProceed}
-                    disabled={
-                      !isConnected ||
-                      !amount ||
-                      depositAmount === BigInt(0) ||
-                      (usdmBalance !== undefined && typeof usdmBalance === 'bigint' && usdmBalance < depositAmount) ||
-                      txStatus === 'approving' ||
-                      txStatus === 'depositing' ||
-                      isWaitingApproval ||
-                      isWaitingDeposit
-                    }
-                    className="w-full py-3 bg-[#2BA3FF] text-white rounded-lg font-semibold hover:bg-[#1a8fdb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {txStatus === 'approving' || isApproving || isWaitingApproval ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Approving...
-                      </>
-                    ) : txStatus === 'depositing' || isDepositing || isWaitingDeposit ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Depositing...
-                      </>
-                    ) : needsApproval ? (
-                      <>
-                        Approve USDm
-                        <AlertCircle className="w-4 h-4" />
-                      </>
-                    ) : (
-                      'Deposit'
-                    )}
-                  </button>
                 </div>
 
                 {/* Available Balance Section - Takes 3/5 of width */}

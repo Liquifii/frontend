@@ -19,7 +19,7 @@ export function Providers(props: {
       <WagmiProvider config={config} initialState={props.initialState}>
         <QueryClientProvider client={queryClient}>
           <SidebarProvider>
-            {props.children}
+          {props.children}
           </SidebarProvider>
         </QueryClientProvider>
       </WagmiProvider>

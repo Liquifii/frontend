@@ -133,7 +133,7 @@ export default function HeroSection() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.5 }}
               className="inline-block"
-            >
+          >
               Automated
             </motion.span>{' '}
             <motion.span
@@ -197,7 +197,7 @@ export default function HeroSection() {
                   animate={{ x: [0, 5, 0] }}
                   transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
                 >
-                  <ArrowRight className="h-5 w-5 text-white" />
+                <ArrowRight className="h-5 w-5 text-white" />
                 </motion.div>
               </Link>
             </motion.button>

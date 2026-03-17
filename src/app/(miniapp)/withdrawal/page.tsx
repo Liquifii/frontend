@@ -26,6 +26,7 @@ import { parseUnits, formatUnits, type Address } from 'viem'
 import { AttestifyVaultContract, CUSD_ADDRESS } from '../../abi'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
+import OffRampForm from '../../../components/offramp-form'
 
 // ERC20 ABI for cUSD token operations
 const ERC20_ABI = [
@@ -529,7 +530,7 @@ export default function WithdrawalPage() {
                       ) : (
                         <>
                           <span className="text-lg">₦</span>
-                          <span>NGN</span>
+                          <span>Fiat (Cash Out)</span>
                         </>
                       )}
                     </div>
@@ -559,173 +560,179 @@ export default function WithdrawalPage() {
                         }`}
                       >
                         <span className="text-lg">₦</span>
-                        <span>NGN</span>
+                        <span>Fiat (Cash Out)</span>
                       </button>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Amount Input */}
-              <div className="mb-6">
-                <label className="block text-white/70 text-sm mb-2">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg">
-                    {currency === 'cusd' ? '$' : '₦'}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        setAmount(value)
-                        setErrorMessage('')
-                      }
-                    }}
-                    placeholder={currency === 'cusd' ? 'Enter amount in cUSD' : 'Enter amount in NGN'}
-                    className="w-full pl-10 pr-20 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
-                  />
-                  {isConnected && currency === 'cusd' && userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint' && userVaultBalance > BigInt(0) && (
-                    <button
-                      type="button"
-                      onClick={handleMaxClick}
-                      disabled={txStatus === 'withdrawing' || txStatus === 'transferring'}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-semibold bg-[#2BA3FF]/20 text-[#2BA3FF] rounded-md hover:bg-[#2BA3FF]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Max
-                    </button>
-                  )}
-                </div>
-                {amount && withdrawalAmount > BigInt(0) && (
-                  <p className="text-xs text-white/50 mt-1">
-                    ≈ {formatBalance(withdrawalAmount)} cUSD
-                  </p>
-                )}
-              </div>
-
-              {/* Withdrawal Range */}
-              <div className="mb-6">
-                <p className="text-white/60 text-sm">
-                  Min: <span className="text-white">
-                    {currency === 'cusd' ? '$1' : '₦1,000'}
-                  </span> | Max: <span className="text-white">
-                    {currency === 'cusd' ? '$100,000' : '₦5,000,000'}
-                  </span>
-                </p>
-              </div>
-
-              {/* Optional: Withdraw to External Address */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-white/70 text-sm">Withdraw to (optional)</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowRecipientInput(!showRecipientInput)
-                      if (!showRecipientInput) {
-                        setRecipientAddress('')
-                      }
-                    }}
-                    disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
-                    className="text-[#2BA3FF] text-xs hover:text-[#1a8fdb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {showRecipientInput ? 'Use Farcaster wallet' : 'Different address?'}
-                  </button>
-                </div>
-                {showRecipientInput ? (
-                  <div>
-                    <label className="block text-white/70 text-sm mb-2">Recipient Address</label>
-                    <input
-                      type="text"
-                      value={recipientAddress}
-                      onChange={(e) => {
-                        setRecipientAddress(e.target.value.trim())
-                        setErrorMessage('')
-                      }}
-                      placeholder="0x..."
-                      disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
-                    />
-                    {recipientAddress && !/^0x[a-fA-F0-9]{40}$/.test(recipientAddress) && (
-                      <p className="text-red-400 text-xs mt-1">Invalid Ethereum address format</p>
-                    )}
-                    <p className="text-white/50 text-xs mt-2">
-                      Funds will be withdrawn to your Farcaster wallet first, then automatically transferred to this address.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 bg-white/5 border border-white/10 rounded-lg">
-                    <p className="text-white/70 text-sm">
-                      <span className="text-white font-medium">Farcaster Wallet</span>
-                      {address && (
-                        <span className="text-white/50 text-xs ml-2 font-mono">
-                          ({address.slice(0, 6)}...{address.slice(-4)})
-                        </span>
+              {/* Fiat Tab Content (Off-ramp) */}
+              {currency === 'ngn' ? (
+                <OffRampForm />
+              ) : (
+                <>
+                  {/* Amount Input */}
+                  <div className="mb-6">
+                    <label className="block text-white/70 text-sm mb-2">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg">
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={amount}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setAmount(value)
+                            setErrorMessage('')
+                          }
+                        }}
+                        placeholder="Enter amount in cUSD"
+                        className="w-full pl-10 pr-20 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
+                      />
+                      {isConnected && userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint' && userVaultBalance > BigInt(0) && (
+                        <button
+                          type="button"
+                          onClick={handleMaxClick}
+                          disabled={txStatus === 'withdrawing' || txStatus === 'transferring'}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-semibold bg-[#2BA3FF]/20 text-[#2BA3FF] rounded-md hover:bg-[#2BA3FF]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Max
+                        </button>
                       )}
+                    </div>
+                    {amount && withdrawalAmount > BigInt(0) && (
+                      <p className="text-xs text-white/50 mt-1">
+                        ≈ {formatBalance(withdrawalAmount)} cUSD
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Withdrawal Range */}
+                  <div className="mb-6">
+                    <p className="text-white/60 text-sm">
+                      Min: <span className="text-white">$1</span> | Max: <span className="text-white">$100,000</span>
                     </p>
                   </div>
-                )}
-              </div>
+                </>
+              )}
 
-              {/* Withdrawal Details */}
-              <div className="mb-6 space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded border-2 border-[#2BA3FF] bg-[#2BA3FF] flex items-center justify-center">
-                    <Check className="w-3 h-3 text-white" />
+              {/* Optional: Withdraw to External Address - Only for cUSD */}
+              {currency === 'cusd' && (
+                <>
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-white/70 text-sm">Withdraw to (optional)</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRecipientInput(!showRecipientInput)
+                          if (!showRecipientInput) {
+                            setRecipientAddress('')
+                          }
+                        }}
+                        disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
+                        className="text-[#2BA3FF] text-xs hover:text-[#1a8fdb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {showRecipientInput ? 'Use Farcaster wallet' : 'Different address?'}
+                      </button>
+                    </div>
+                    {showRecipientInput ? (
+                      <div>
+                        <label className="block text-white/70 text-sm mb-2">Recipient Address</label>
+                        <input
+                          type="text"
+                          value={recipientAddress}
+                          onChange={(e) => {
+                            setRecipientAddress(e.target.value.trim())
+                            setErrorMessage('')
+                          }}
+                          placeholder="0x..."
+                          disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
+                          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
+                        />
+                        {recipientAddress && !/^0x[a-fA-F0-9]{40}$/.test(recipientAddress) && (
+                          <p className="text-red-400 text-xs mt-1">Invalid Ethereum address format</p>
+                        )}
+                        <p className="text-white/50 text-xs mt-2">
+                          Funds will be withdrawn to your Farcaster wallet first, then automatically transferred to this address.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="px-4 py-3 bg-white/5 border border-white/10 rounded-lg">
+                        <p className="text-white/70 text-sm">
+                          <span className="text-white font-medium">Farcaster Wallet</span>
+                          {address && (
+                            <span className="text-white/50 text-xs ml-2 font-mono">
+                              ({address.slice(0, 6)}...{address.slice(-4)})
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <span className="text-white text-sm">Gas Fee: 0%</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded border-2 border-[#2BA3FF] bg-[#2BA3FF] flex items-center justify-center">
-                    <Check className="w-3 h-3 text-white" />
+
+                  {/* Withdrawal Details */}
+                  <div className="mb-6 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded border-2 border-[#2BA3FF] bg-[#2BA3FF] flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                      <span className="text-white text-sm">Gas Fee: 0%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded border-2 border-[#2BA3FF] bg-[#2BA3FF] flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                      <span className="text-white text-sm">Arrival time: Instant</span>
+                    </div>
                   </div>
-                  <span className="text-white text-sm">Arrival time: Instant</span>
-                </div>
-              </div>
 
-              {/* Withdraw Button */}
-              <button
-                onClick={handleWithdraw}
-                disabled={Boolean(
-                  !isConnected ||
-                  txStatus === 'withdrawing' ||
-                  txStatus === 'transferring' ||
-                  !amount || (amount && amount.trim() === '') ||
-                  withdrawalAmount === BigInt(0) ||
-                  !hasSufficientBalance ||
-                  currency !== 'cusd' ||
-                  (showRecipientInput && recipientAddress && recipientAddress.trim() !== '' && !/^0x[a-fA-F0-9]{40}$/.test(recipientAddress))
-                )}
-                className="w-full py-3 bg-[#2BA3FF] text-white rounded-lg font-semibold hover:bg-[#1a8fdb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {txStatus === 'withdrawing' ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Processing Withdrawal...</span>
-                  </>
-                ) : txStatus === 'transferring' ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Transferring to External Wallet...</span>
-                  </>
-                ) : txStatus === 'success' ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>Withdrawal Successful</span>
-                  </>
-                ) : (
-                  `Withdraw ${currency === 'cusd' ? 'cUSD' : 'NGN'}`
-                )}
-              </button>
+                  {/* Withdraw Button */}
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={Boolean(
+                      !isConnected ||
+                      txStatus === 'withdrawing' ||
+                      txStatus === 'transferring' ||
+                      !amount || (amount && amount.trim() === '') ||
+                      withdrawalAmount === BigInt(0) ||
+                      !hasSufficientBalance ||
+                      (showRecipientInput && recipientAddress && recipientAddress.trim() !== '' && !/^0x[a-fA-F0-9]{40}$/.test(recipientAddress))
+                    )}
+                    className="w-full py-3 bg-[#2BA3FF] text-white rounded-lg font-semibold hover:bg-[#1a8fdb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {txStatus === 'withdrawing' ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Processing Withdrawal...</span>
+                      </>
+                    ) : txStatus === 'transferring' ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Transferring to External Wallet...</span>
+                      </>
+                    ) : txStatus === 'success' ? (
+                      <>
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>Withdrawal Successful</span>
+                      </>
+                    ) : (
+                      'Withdraw cUSD'
+                    )}
+                  </button>
 
-              {!isConnected && (
-                <p className="text-center text-white/50 text-sm mt-4">
-                  Please connect your wallet to withdraw
-                </p>
+                  {!isConnected && (
+                    <p className="text-center text-white/50 text-sm mt-4">
+                      Please connect your wallet to withdraw
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
