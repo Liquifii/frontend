@@ -28,7 +28,7 @@ import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import OffRampForm from '../../../components/offramp-form'
 
-// ERC20 ABI for cUSD token operations
+// ERC20 ABI for USDm token operations
 const ERC20_ABI = [
   {
     inputs: [{ name: 'account', type: 'address' }],
@@ -59,7 +59,7 @@ const isInMiniApp = (): boolean => {
 export default function WithdrawalPage() {
   const router = useRouter()
   const [amount, setAmount] = useState('')
-  const [currency, setCurrency] = useState<'cusd' | 'ngn'>('cusd')
+  const [currency, setCurrency] = useState<'usdm' | 'ngn'>('usdm')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [isSDKLoaded, setIsSDKLoaded] = useState(false)
@@ -87,7 +87,7 @@ export default function WithdrawalPage() {
     },
   })
 
-  // Read user's wallet cUSD balance
+  // Read user's wallet USDm balance
   const { 
     data: walletBalance, 
     refetch: refetchWalletBalance 
@@ -104,7 +104,7 @@ export default function WithdrawalPage() {
 
   // Parse withdrawal amount
   const withdrawalAmount = useMemo(() => {
-    if (!amount || currency !== 'cusd') return BigInt(0)
+    if (!amount || currency !== 'usdm') return BigInt(0)
     try {
       return parseUnits(amount, 18)
     } catch {
@@ -358,8 +358,8 @@ export default function WithdrawalPage() {
       return
     }
 
-    if (currency !== 'cusd') {
-      setErrorMessage('Only cUSD withdrawals are currently supported.')
+    if (currency !== 'usdm') {
+      setErrorMessage('Only USDm withdrawals are currently supported.')
       return
     }
 
@@ -522,10 +522,10 @@ export default function WithdrawalPage() {
                     className="w-full flex items-center justify-between px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-center gap-2">
-                      {currency === 'cusd' ? (
+                      {currency === 'usdm' ? (
                         <>
                           <DollarSign className="w-4 h-4" />
-                          <span>cUSD</span>
+                          <span>USDm</span>
                         </>
                       ) : (
                         <>
@@ -540,15 +540,15 @@ export default function WithdrawalPage() {
                     <div className="absolute z-10 w-full mt-2 bg-[#1a1a1d] border border-white/10 rounded-lg overflow-hidden">
                       <button
                         onClick={() => {
-                          setCurrency('cusd')
+                          setCurrency('usdm')
                           setDropdownOpen(false)
                         }}
                         className={`w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-white/5 transition-colors ${
-                          currency === 'cusd' ? 'bg-[#2BA3FF]/20 text-[#2BA3FF]' : 'text-white'
+                          currency === 'usdm' ? 'bg-[#2BA3FF]/20 text-[#2BA3FF]' : 'text-white'
                         }`}
                       >
                         <DollarSign className="w-4 h-4" />
-                        <span>cUSD</span>
+                        <span>USDm</span>
                       </button>
                       <button
                         onClick={() => {
@@ -591,7 +591,7 @@ export default function WithdrawalPage() {
                             setErrorMessage('')
                           }
                         }}
-                        placeholder="Enter amount in cUSD"
+                        placeholder="Enter amount in USDm"
                         className="w-full pl-10 pr-20 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={!isConnected || txStatus === 'withdrawing' || txStatus === 'transferring'}
                       />
@@ -608,7 +608,7 @@ export default function WithdrawalPage() {
                     </div>
                     {amount && withdrawalAmount > BigInt(0) && (
                       <p className="text-xs text-white/50 mt-1">
-                        ≈ {formatBalance(withdrawalAmount)} cUSD
+                        ≈ {formatBalance(withdrawalAmount)} USDm
                       </p>
                     )}
                   </div>
@@ -622,8 +622,8 @@ export default function WithdrawalPage() {
                 </>
               )}
 
-              {/* Optional: Withdraw to External Address - Only for cUSD */}
-              {currency === 'cusd' && (
+              {/* Optional: Withdraw to External Address - Only for USDm */}
+              {currency === 'usdm' && (
                 <>
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-3">
@@ -723,7 +723,7 @@ export default function WithdrawalPage() {
                         <span>Withdrawal Successful</span>
                       </>
                     ) : (
-                      'Withdraw cUSD'
+                      'Withdraw USDm'
                     )}
                   </button>
 
