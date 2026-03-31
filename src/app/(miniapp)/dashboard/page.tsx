@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion } from 'framer-motion'
 import {
   Brain,
@@ -24,9 +24,34 @@ export default function DashboardPage() {
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; value: number; label: string; date: Date } | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [farcasterUsername, setFarcasterUsername] = useState<string | null>(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [lastSeenTxTimestamp, setLastSeenTxTimestamp] = useState<number>(0)
+  const notificationsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadMiniAppUser = async () => {
+      try {
+        const context = await sdk.context
+        const username = context?.user?.username
+        if (!cancelled && username) {
+          setFarcasterUsername(username)
+        }
+      } catch {
+        // Ignore when not in mini-app context
+      }
+    }
+
+    loadMiniAppUser()
+    return () => {
+      cancelled = true
+    }
   }, [])
   // Get connected wallet address from Farcaster
   // Note: Farcaster connector provides the Farcaster wallet address
@@ -43,9 +68,10 @@ export default function DashboardPage() {
   // Format display name: ENS name if available, otherwise shortened address
   const displayName = useMemo(() => {
     if (!address) return 'Guest'
+    if (farcasterUsername) return `@${farcasterUsername}`
     if (ensName) return ensName
     return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }, [address, ensName])
+  }, [address, ensName, farcasterUsername])
 
   // ERC20 ABI for reading wallet balance
   const ERC20_ABI = [
@@ -241,6 +267,7 @@ export default function DashboardPage() {
         id: d.id,
         timestamp: Number(d.blockTimestamp),
         assets: BigInt(d.assets),
+        transactionHash: d.transactionHash,
       })),
       ...withdrawals.map((w) => ({
         type: 'Withdrawal',
@@ -251,6 +278,7 @@ export default function DashboardPage() {
         id: w.id,
         timestamp: Number(w.blockTimestamp),
         assets: BigInt(w.assets),
+        transactionHash: w.transactionHash,
       }))
     ]
     
@@ -258,6 +286,73 @@ export default function DashboardPage() {
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     )
   }, [address, depositedData, withdrawalData])
+
+  const notifications = useMemo(() => transactions.slice(0, 8), [transactions])
+
+  const groupedNotifications = useMemo(() => {
+    const today: typeof notifications = []
+    const yesterday: typeof notifications = []
+    const earlier: typeof notifications = []
+
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000
+
+    notifications.forEach((tx) => {
+      const txTime = tx.timestamp * 1000
+      if (txTime >= startOfToday) {
+        today.push(tx)
+      } else if (txTime >= startOfYesterday) {
+        yesterday.push(tx)
+      } else {
+        earlier.push(tx)
+      }
+    })
+
+    return { today, yesterday, earlier }
+  }, [notifications])
+
+  const unreadCount = useMemo(() => {
+    if (!lastSeenTxTimestamp) return notifications.length
+    return notifications.filter((tx) => tx.timestamp > lastSeenTxTimestamp).length
+  }, [notifications, lastSeenTxTimestamp])
+
+  useEffect(() => {
+    if (!address) {
+      setLastSeenTxTimestamp(0)
+      return
+    }
+
+    const key = `dashboard:lastSeenTx:${address.toLowerCase()}`
+    const stored = window.localStorage.getItem(key)
+    const parsed = stored ? Number(stored) : 0
+    setLastSeenTxTimestamp(Number.isFinite(parsed) ? parsed : 0)
+  }, [address])
+
+  useEffect(() => {
+    const onClickOutside = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const handleToggleNotifications = () => {
+    const nextOpen = !notificationsOpen
+    setNotificationsOpen(nextOpen)
+
+    if (nextOpen && address && notifications.length > 0) {
+      const newestTimestamp = notifications[0].timestamp
+      setLastSeenTxTimestamp(newestTimestamp)
+      window.localStorage.setItem(
+        `dashboard:lastSeenTx:${address.toLowerCase()}`,
+        String(newestTimestamp)
+      )
+    }
+  }
 
   // Calculate balance history for chart
   const balanceHistory = useMemo(() => {
@@ -332,11 +427,77 @@ export default function DashboardPage() {
                 </p>
               )}
             </div>
-            <div className="relative">
-              <Bell className="w-5 h-5 text-white" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
-                12
-              </span>
+            <div className="relative" ref={notificationsRef}>
+              <button
+                type="button"
+                onClick={handleToggleNotifications}
+                className="relative p-1 rounded-md hover:bg-white/10 transition-colors"
+                aria-label="Open notifications"
+              >
+                <Bell className="w-5 h-5 text-white" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full flex items-center justify-center text-[10px] text-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 w-72 max-h-80 overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1d] shadow-2xl z-20">
+                  <div className="px-3 py-2 border-b border-white/10 text-sm text-white/80 font-medium">
+                    Notifications
+                  </div>
+                  {notifications.length === 0 ? (
+                    <p className="px-3 py-4 text-sm text-white/50">No transactions yet.</p>
+                  ) : (
+                    <>
+                      {(['today', 'yesterday', 'earlier'] as const).map((groupKey) => {
+                        const labelMap = { today: 'Today', yesterday: 'Yesterday', earlier: 'Earlier' }
+                        const items = groupedNotifications[groupKey]
+                        if (items.length === 0) return null
+
+                        return (
+                          <div key={groupKey}>
+                            <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40 bg-white/[0.02] border-y border-white/5">
+                              {labelMap[groupKey]}
+                            </div>
+                            {items.map((tx) => {
+                              const isDeposit = tx.type === 'Deposit'
+                              return (
+                                <div key={tx.id} className="px-3 py-2 border-b border-white/5 last:border-0">
+                                  <div className="flex items-start gap-2">
+                                    <div className={`mt-0.5 p-1 rounded-md ${isDeposit ? 'bg-green-500/15 text-green-400' : 'bg-orange-500/15 text-orange-400'}`}>
+                                      {isDeposit ? <ArrowDownToLine className="w-3.5 h-3.5" /> : <ArrowUpFromLine className="w-3.5 h-3.5" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-white">
+                                        {tx.type} {tx.amount} USDm
+                                      </p>
+                                      <p className="text-xs text-white/50">
+                                        {new Date(tx.timestamp * 1000).toLocaleString()}
+                                      </p>
+                                      {tx.transactionHash && (
+                                        <a
+                                          href={`https://celoscan.io/tx/${tx.transactionHash}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-block mt-1 text-[11px] text-[#2BA3FF] hover:text-[#66bcff] transition-colors"
+                                        >
+                                          View on explorer
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

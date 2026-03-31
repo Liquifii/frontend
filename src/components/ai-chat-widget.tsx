@@ -8,6 +8,13 @@ import Link from 'next/link'
 export default function AIChatWidget() {
   const [isOpen, setIsOpen] = useState(false)
   const [hasAutoOpened, setHasAutoOpened] = useState(false)
+  const [isMiniApp, setIsMiniApp] = useState(false)
+
+  useEffect(() => {
+    const inMiniApp =
+      window.self !== window.top || !!window.ReactNativeWebView || window.location !== window.parent.location
+    setIsMiniApp(inMiniApp)
+  }, [])
 
   // Auto-open after 5 seconds on landing page (common pattern: 5-10 seconds)
   useEffect(() => {
@@ -20,6 +27,10 @@ export default function AIChatWidget() {
 
     return () => clearTimeout(timer)
   }, [hasAutoOpened])
+
+  // Floating widgets are prone to overflow issues in embedded mini-app webviews.
+  // Keep this for the full web landing page, and hide it in mini-app context.
+  if (isMiniApp) return null
 
   return (
     <>
@@ -86,7 +97,7 @@ export default function AIChatWidget() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 20 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="absolute bottom-16 sm:bottom-20 right-0 w-[calc(100vw-3rem)] sm:w-80 md:w-96 max-w-sm bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl p-3 sm:p-4 md:p-5"
+              className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-24 sm:w-80 md:w-96 sm:max-w-sm bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl p-3 sm:p-4 md:p-5 z-50"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2 sm:gap-3">

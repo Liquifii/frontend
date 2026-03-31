@@ -28,7 +28,7 @@ import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import OnRampForm from '../../../components/onramp-form'
 
-// ERC20 ABI for cUSD token operations
+// ERC20 ABI for USDm token operations
 const ERC20_ABI = [
   {
     inputs: [{ name: 'account', type: 'address' }],
@@ -75,7 +75,7 @@ const isInMiniApp = (): boolean => {
 
 export default function DepositPage() {
   const router = useRouter()
-  const [selectedTab, setSelectedTab] = useState<'fiat' | 'cusd'>('cusd')
+  const [selectedTab, setSelectedTab] = useState<'fiat' | 'usdm'>('usdm')
   const [amount, setAmount] = useState('')
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [balanceHidden, setBalanceHidden] = useState(false)
@@ -86,8 +86,8 @@ export default function DepositPage() {
 
   const { address, isConnected } = useAccount()
 
-  // Read user's cUSD balance
-  const { data: cusdBalance, refetch: refetchBalance } = useReadContract({
+  // Read user's USDm balance
+  const { data: usdmBalance, refetch: refetchBalance } = useReadContract({
     address: CUSD_ADDRESS as Address,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
@@ -101,7 +101,7 @@ export default function DepositPage() {
 
   // Read user's allowance for vault
   const depositAmount = useMemo(() => {
-    if (!amount || selectedTab !== 'cusd') return 0n
+    if (!amount || selectedTab !== 'usdm') return 0n
     try {
       return parseUnits(amount, 18)
     } catch {
@@ -310,7 +310,7 @@ export default function DepositPage() {
 
     // Double-check allowance before depositing
     if (needsApproval || (allowance !== undefined && allowance !== null && typeof allowance === 'bigint' && allowance < depositAmount)) {
-      setErrorMessage('Insufficient allowance. Please approve cUSD first.')
+      setErrorMessage('Insufficient allowance. Please approve USDm first.')
       setTxStatus('idle')
       return
     }
@@ -351,7 +351,7 @@ export default function DepositPage() {
   // Handle proceed button click
   const handleProceed = () => {
     if (selectedTab === 'fiat') {
-      setErrorMessage('Fiat deposits are not yet available. Please use cUSD.')
+      setErrorMessage('Fiat deposits are not yet available. Please use USDm.')
       return
     }
 
@@ -437,7 +437,7 @@ export default function DepositPage() {
       
       // Check for specific allowance error
       if (errorMsg.includes('insufficient allowance') || errorMsg.includes('allowance')) {
-        errorMsg = 'Insufficient allowance. Please approve cUSD first by clicking "Approve cUSD".'
+        errorMsg = 'Insufficient allowance. Please approve USDm first by clicking "Approve USDm".'
         // Refetch allowance to update the UI
         refetchAllowance()
       }
@@ -658,15 +658,15 @@ export default function DepositPage() {
                       Fiat
                     </button>
                     <button
-                      onClick={() => setSelectedTab('cusd')}
+                      onClick={() => setSelectedTab('usdm')}
                       className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors ${
-                        selectedTab === 'cusd'
+                        selectedTab === 'usdm'
                           ? 'bg-[#2BA3FF] text-white border border-[#2BA3FF]'
                           : 'bg-white/5 text-white/70 hover:bg-white/10 border border-transparent'
                       }`}
                     >
                       <Coins className="w-4 h-4" />
-                      cUSD
+                      USDm
                     </button>
                   </div>
 
@@ -695,14 +695,14 @@ export default function DepositPage() {
                                 setErrorMessage('')
                               }
                             }}
-                            placeholder="Enter amount in cUSD"
+                            placeholder="Enter amount in USDm"
                             className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors"
                             disabled={!isConnected || txStatus === 'approving' || txStatus === 'depositing'}
                           />
                         </div>
                         {amount && depositAmount > BigInt(0) && (
                           <p className="text-xs text-white/50 mt-1">
-                            ≈ {formatAmount(depositAmount)} cUSD
+                            ≈ {formatAmount(depositAmount)} USDm
                           </p>
                         )}
                       </div>
@@ -711,12 +711,12 @@ export default function DepositPage() {
                       <div className="mb-6">
                         <p className="text-white/60 text-sm">
                           Deposit Range: <span className="text-white">
-                            Min: 1 cUSD | Max: 100,000 cUSD
+                            Min: 1 USDm | Max: 100,000 USDm
                           </span>
                         </p>
-                        {isConnected && cusdBalance !== undefined && (
+                        {isConnected && usdmBalance !== undefined && (
                           <p className="text-white/50 text-xs mt-1">
-                            Available: {formatAmount(cusdBalance)} cUSD
+                            Available: {formatAmount(usdmBalance)} USDm
                           </p>
                         )}
                       </div>
@@ -748,22 +748,22 @@ export default function DepositPage() {
                       {/* Balance Display - Always show when connected */}
                       {isConnected && (
                         <div className="mb-4">
-                          {cusdBalance === undefined ? (
+                          {usdmBalance === undefined ? (
                             <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2">
                               <Loader2 className="w-5 h-5 text-yellow-400 flex-shrink-0 animate-spin" />
                               <p className="text-yellow-400 text-sm">Loading balance...</p>
                             </div>
-                          ) : depositAmount > BigInt(0) && cusdBalance < depositAmount ? (
+                          ) : depositAmount > BigInt(0) && usdmBalance < depositAmount ? (
                             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
                               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
                               <p className="text-red-400 text-sm break-words">
-                                Insufficient balance. You have {formatAmount(cusdBalance)} cUSD
+                                Insufficient balance. You have {formatAmount(usdmBalance)} USDm
                               </p>
                             </div>
                           ) : (
                             <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                               <p className="text-blue-400 text-sm break-words">
-                                Wallet Balance: {formatAmount(cusdBalance)} cUSD
+                                Wallet Balance: {formatAmount(usdmBalance)} USDm
                               </p>
                             </div>
                           )}
@@ -775,9 +775,9 @@ export default function DepositPage() {
                         <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                           <p className="text-blue-400 text-sm break-words">
                             {needsApproval ? (
-                              <>⚠️ Approval needed: {formatAmount(allowance as bigint)} cUSD approved, need {formatAmount(depositAmount)} cUSD</>
+                              <>⚠️ Approval needed: {formatAmount(allowance as bigint)} USDm approved, need {formatAmount(depositAmount)} USDm</>
                             ) : (
-                              <>✅ Sufficient allowance: {formatAmount(allowance as bigint)} cUSD approved</>
+                              <>✅ Sufficient allowance: {formatAmount(allowance as bigint)} USDm approved</>
                             )}
                           </p>
                         </div>
@@ -790,7 +790,7 @@ export default function DepositPage() {
                           !isConnected ||
                           !amount ||
                           depositAmount === BigInt(0) ||
-                          (cusdBalance !== undefined && typeof cusdBalance === 'bigint' && cusdBalance < depositAmount) ||
+                          (usdmBalance !== undefined && typeof usdmBalance === 'bigint' && usdmBalance < depositAmount) ||
                           txStatus === 'approving' ||
                           txStatus === 'depositing' ||
                           isWaitingApproval ||
@@ -810,7 +810,7 @@ export default function DepositPage() {
                           </>
                         ) : needsApproval ? (
                           <>
-                            Approve cUSD
+                            Approve USDm
                             <AlertCircle className="w-4 h-4" />
                           </>
                         ) : (

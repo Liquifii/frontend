@@ -23,7 +23,7 @@ function App() {
   }, [isSDKLoaded]);
 
   return (
-    <>
+    <main className="overflow-x-hidden">
       <Navbar />
       <HeroSection />
       <Features />
@@ -31,7 +31,7 @@ function App() {
       <CTASection />
       <Footer />
       <AIChatWidget />
-    </>
+    </main>
   )
 }
 
