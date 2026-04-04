@@ -16,7 +16,7 @@ import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { useAccount, useReadContract, useEnsName } from 'wagmi'
 import { formatUnits, type Address } from 'viem'
-import { AttestifyVaultContract, StrategyContract, CUSD_ADDRESS } from '../abi'
+import { AttestifyVaultContract, StrategyContract, CUSD_ADDRESS, REGISTRY_ADDRESS, REGISTRY_ABI, TOKENS } from '../abi'
 import YieldAnimation from '../../components/yield-animation'
 
 export default function DashboardPage() {
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; value: number; label: string; date: Date } | null>(null)
   const [farcasterUsername, setFarcasterUsername] = useState<string | null>(null)
+  const [apyAsset, setApyAsset] = useState<'USDC' | 'USDT' | 'USDM'>('USDC')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [lastSeenTxTimestamp, setLastSeenTxTimestamp] = useState<number>(0)
   const notificationsRef = useRef<HTMLDivElement>(null)
@@ -112,21 +113,33 @@ export default function DashboardPage() {
     },
   })
 
-  // Read strategy APY
+  // Per-asset APY resolution: registry -> vault -> strategy -> getCurrentAPY
+  const apyTokenAddress = TOKENS[apyAsset].address as Address
+  const { data: apyVault } = useReadContract({
+    address: REGISTRY_ADDRESS as Address,
+    abi: REGISTRY_ABI,
+    functionName: 'getVault',
+    args: [apyTokenAddress],
+    query: { enabled: true, refetchInterval: 30000 },
+  })
+  const { data: apyStrategyAddr } = useReadContract({
+    address: (typeof apyVault === 'string' && apyVault !== '0x0000000000000000000000000000000000000000'
+      ? (apyVault as Address)
+      : (AttestifyVaultContract.address as Address)),
+    abi: AttestifyVaultContract.AttestifyVault,
+    functionName: 'strategy',
+    query: { enabled: true, refetchInterval: 30000 },
+  })
   const { 
     data: apyBasisPoints,
     isLoading: isLoadingAPY,
-    error: apyError,
-    refetch: refetchAPY
   } = useReadContract({
-    address: StrategyContract.address as Address,
+    address: (typeof apyStrategyAddr === 'string'
+      ? (apyStrategyAddr as Address)
+      : (StrategyContract.address as Address)),
     abi: StrategyContract.Strategy,
     functionName: 'getCurrentAPY',
-    query: {
-      enabled: isConnected && !!StrategyContract.address,
-      retry: 2,
-      refetchInterval: 30000, // APY changes less frequently, refresh every 30 seconds
-    },
+    query: { enabled: true, refetchInterval: 30000 },
   })
 
 
@@ -607,7 +620,22 @@ export default function DashboardPage() {
 
             {/* Current APY Card */}
             <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6">
-              <h3 className="text-white/70 text-sm font-medium mb-4">Current APY</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white/70 text-sm font-medium">Current APY</h3>
+                <div className="flex items-center gap-2">
+                  {(['USDC','USDT','USDM'] as const).map(sym => (
+                    <button
+                      key={sym}
+                      onClick={() => setApyAsset(sym)}
+                      className={`px-2 py-1 rounded-md text-xs border ${
+                        apyAsset === sym ? 'border-[#2BA3FF] text.white bg-[#2BA3FF]/10' : 'border-white/10 text-white/70 hover:bg-white/5'
+                      }`}
+                    >
+                      {sym}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <p className="text-3xl font-bold text-white mb-2">
                 {isLoadingAPY
                   ? 'Loading...'

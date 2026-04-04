@@ -527,12 +527,13 @@ export default function DepositPage() {
   useEffect(() => {
     if (depositError) {
       setTxStatus('error')
-      let errorMsg = depositError.message || 'Deposit failed. Please check your wallet.'
+      // Map on-chain/viem errors to user-friendly copy
+      const errorMsgLower = (depositError.message || '').toLowerCase()
+      let errorMsg = 'Deposit failed. Please check your wallet.'
       
-      // Parse and humanize common error messages
-      const errorMsgLower = errorMsg.toLowerCase()
-      
-      if (errorMsgLower.includes('insufficient allowance') || errorMsgLower.includes('allowance')) {
+      if (errorMsgLower.includes('invalidamount') || errorMsgLower.includes('execution reverted')) {
+        errorMsg = `Amount too small for this vault. Minimum deposit is 1 USDm.`
+      } else if (errorMsgLower.includes('insufficient allowance') || errorMsgLower.includes('allowance')) {
         errorMsg = 'Insufficient allowance. Please approve USDm first by clicking "Approve USDm".'
         refetchAllowance()
       } else if (errorMsgLower.includes('insufficient balance') || errorMsgLower.includes('balance')) {
@@ -540,15 +541,6 @@ export default function DepositPage() {
         refetchBalance()
       } else if (errorMsgLower.includes('user rejected') || errorMsgLower.includes('user denied')) {
         errorMsg = 'Transaction was cancelled. Please try again when ready.'
-      } else if (errorMsgLower.includes('execution reverted')) {
-        // Try to extract more specific error
-        if (errorMsgLower.includes('min') || errorMsgLower.includes('minimum')) {
-          errorMsg = `Deposit amount is below the minimum. Minimum deposit is ${MIN_DEPOSIT_USDM} USDm.`
-        } else if (errorMsgLower.includes('max') || errorMsgLower.includes('maximum')) {
-          errorMsg = `Deposit amount exceeds the maximum. Maximum deposit is ${MAX_DEPOSIT_USDM.toLocaleString()} USDm.`
-        } else {
-          errorMsg = 'Transaction failed. Please check the amount and try again.'
-        }
       } else if (errorMsgLower.includes('network') || errorMsgLower.includes('connection')) {
         errorMsg = 'Network error. Please check your connection and try again.'
       }

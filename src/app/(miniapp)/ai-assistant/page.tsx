@@ -25,7 +25,7 @@ import { useRouter } from 'next/navigation'
 import { useAccount, useReadContract } from 'wagmi'
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseUnits, formatUnits, type Address } from 'viem'
-import { AttestifyVaultContract, CUSD_ADDRESS } from '../../abi'
+import { AttestifyVaultContract, CUSD_ADDRESS, TOKENS, REGISTRY_ADDRESS, REGISTRY_ABI } from '../../abi'
 import { sdk } from '@farcaster/miniapp-sdk'
 
 // Utility to detect if we're in Farcaster MiniApp
@@ -97,7 +97,9 @@ type Message = {
   timestamp: Date
   transactionRequest?: {
     action: 'deposit' | 'withdraw'
-    amount_usdm: number
+    amount: number
+    asset?: 'USDC' | 'USDT' | 'CUSD'
+    asset_label?: string
   }
   txHash?: string
 }
@@ -114,6 +116,17 @@ export default function AIAssistantPage() {
   const router = useRouter()
   const { address, isConnected } = useAccount()
   const { writeContract, data: txHash, error: writeError, reset: resetWrite } = useWriteContract()
+  const [txAsset, setTxAsset] = useState<'USDC' | 'USDT' | 'CUSD'>('CUSD')
+  const [txAssetLabel, setTxAssetLabel] = useState<string>('USDm')
+  const [txDecimals, setTxDecimals] = useState<number>(18)
+  const tokenAddress = txAsset === 'USDC' ? (TOKENS.USDC.address as Address) : txAsset === 'USDT' ? (TOKENS.USDT.address as Address) : (CUSD_ADDRESS as Address)
+  const { data: resolvedVault } = useReadContract({
+    address: REGISTRY_ADDRESS as Address,
+    abi: REGISTRY_ABI,
+    functionName: 'getVault',
+    args: [tokenAddress],
+    query: { enabled: true, refetchInterval: 15000 },
+  })
   
   // Read user's wallet USDm balance
   const { data: walletBalance, refetch: refetchWalletBalance } = useReadContract({
@@ -154,6 +167,8 @@ export default function AIAssistantPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const hasUserInteracted = useRef(false)
+  // When agent requests a tx without specifying asset, we stage a draft until user picks the asset
+  const [txDraft, setTxDraft] = useState<{ action: 'deposit' | 'withdraw'; amount: number } | null>(null)
   
   // SelfClaw trust verification
   const [trustData, setTrustData] = useState<{
@@ -243,7 +258,7 @@ export default function AIAssistantPage() {
   const formatAmount = (value: bigint | undefined) => {
     if (value === undefined || value === null) return '0.00'
     try {
-      const formatted = formatUnits(value, 18)
+      const formatted = formatUnits(value, txDecimals)
       const num = parseFloat(formatted)
       if (num >= 1000) {
         return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
@@ -261,7 +276,7 @@ export default function AIAssistantPage() {
   const validateTransaction = (): string | null => {
     if (!transactionStatus) return 'No transaction to validate'
 
-    const amountWei = parseUnits(transactionStatus.amount.toString(), 18)
+    const amountWei = parseUnits(transactionStatus.amount.toString(), txDecimals)
 
     // Check minimum deposit/withdrawal
     if (amountWei < MIN_DEPOSIT_WEI) {
@@ -278,7 +293,7 @@ export default function AIAssistantPage() {
       if (walletBalance !== undefined && typeof walletBalance === 'bigint') {
         if (walletBalance < amountWei) {
           const balanceFormatted = formatAmount(walletBalance)
-          return `Insufficient balance. You have ${balanceFormatted} USDm, but trying to deposit ${transactionStatus.amount} USDm.`
+          return `Insufficient balance. You have ${balanceFormatted} ${txAssetLabel}, but trying to deposit ${transactionStatus.amount} ${txAssetLabel}.`
         }
       }
     }
@@ -288,7 +303,7 @@ export default function AIAssistantPage() {
       if (vaultBalance !== undefined && typeof vaultBalance === 'bigint') {
         if (vaultBalance < amountWei) {
           const balanceFormatted = formatAmount(vaultBalance)
-          return `Insufficient vault balance. You have ${balanceFormatted} USDm in the vault, but trying to withdraw ${transactionStatus.amount} USDm.`
+          return `Insufficient vault balance. You have ${balanceFormatted} ${txAssetLabel} in the vault, but trying to withdraw ${transactionStatus.amount} ${txAssetLabel}.`
         }
       }
     }
@@ -399,11 +414,11 @@ export default function AIAssistantPage() {
     try {
       setTransactionStatus((prev) => prev ? { ...prev, status: 'executing' } : null)
 
-      const amountWei = parseUnits(transactionStatus.amount.toString(), 18)
+      const amountWei = parseUnits(transactionStatus.amount.toString(), txDecimals)
 
       if (transactionStatus.type === 'deposit') {
         writeContract({
-          address: AttestifyVaultContract.address as Address,
+          address: (typeof resolvedVault === 'string' && !/^0x0{40}$/i.test(resolvedVault as string) ? (resolvedVault as Address) : (AttestifyVaultContract.address as Address)),
           abi: VAULT_ABI,
           functionName: 'deposit',
           args: [amountWei],
@@ -412,7 +427,7 @@ export default function AIAssistantPage() {
         // Withdraw with 1% slippage tolerance
         const minAssetsOut = (amountWei * BigInt(99)) / BigInt(100)
         writeContract({
-          address: AttestifyVaultContract.address as Address,
+          address: (typeof resolvedVault === 'string' && !/^0x0{40}$/i.test(resolvedVault as string) ? (resolvedVault as Address) : (AttestifyVaultContract.address as Address)),
           abi: VAULT_ABI,
           functionName: 'withdraw',
           args: [amountWei, minAssetsOut],
@@ -432,10 +447,12 @@ export default function AIAssistantPage() {
     )
 
     // Add success message to chat
-    const formattedAmount = transactionStatus.amount.toLocaleString(undefined, {
+    const formattedAmount = typeof transactionStatus.amount === 'number'
+      ? transactionStatus.amount.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 4,
-    })
+      })
+      : '0.00'
     setMessages((prev) => [
       ...prev,
       {
@@ -499,25 +516,38 @@ export default function AIAssistantPage() {
       }
 
       const data = await response.json()
-      const assistantContent = data.reply || 'I couldn\'t generate a response. Please try again.'
+      const missingAsset = !!(data.transactionRequest && !data.transactionRequest.asset)
+      const assistantContent = missingAsset
+        ? 'Which asset would you like to use for this transaction? Please select USDm, USDC, or USDT.'
+        : (data.reply || 'I couldn\'t generate a response. Please try again.')
 
+      // Only attach transactionRequest to the chat when asset is specified
       const assistantMessage: Message = {
         role: 'assistant',
         content: assistantContent,
         timestamp: new Date(),
-        transactionRequest: data.transactionRequest,
+        transactionRequest: missingAsset ? undefined : data.transactionRequest,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
 
-      // Handle transaction request
+      // Handle transaction request workflow
       if (data.transactionRequest) {
-        const { action, amount_usdm } = data.transactionRequest
-        setTransactionStatus({
-          type: action,
-          amount: amount_usdm,
-          status: 'pending',
-        })
+        const { action, amount, asset, asset_label } = data.transactionRequest
+        if (!asset) {
+          // Stage draft and wait for user asset selection (quick chips shown below input)
+          setTxDraft({ action, amount })
+        } else {
+          const nextAsset = asset as 'USDC' | 'USDT' | 'CUSD'
+          setTxAsset(nextAsset)
+          setTxAssetLabel(asset_label || (nextAsset === 'CUSD' ? 'USDm' : nextAsset))
+          setTxDecimals(nextAsset === 'USDC' || nextAsset === 'USDT' ? 6 : 18)
+          setTransactionStatus({
+            type: action,
+            amount,
+            status: 'pending',
+          })
+        }
       }
     } catch (error) {
       setMessages((prev) => [
@@ -549,10 +579,10 @@ export default function AIAssistantPage() {
       const maxApproval = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
 
       writeContract({
-        address: CUSD_ADDRESS as Address,
+        address: tokenAddress,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [AttestifyVaultContract.address as Address, maxApproval],
+        args: [(typeof resolvedVault === 'string' && !/^0x0{40}$/i.test(resolvedVault as string) ? (resolvedVault as Address) : (AttestifyVaultContract.address as Address)), maxApproval],
       })
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Approval failed'
@@ -723,10 +753,10 @@ export default function AIAssistantPage() {
                     {message.transactionRequest && (
                       <div className="mt-3 pt-3 border-t border-white/20">
                         <p className="text-xs text-white/70 mb-2">
-                          Transaction Request: {message.transactionRequest.action} ${message.transactionRequest.amount_usdm?.toLocaleString(undefined, {
+                          Transaction Request: {message.transactionRequest.action} ${message.transactionRequest.amount?.toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 4,
-                          })} USDm
+                          })} {message.transactionRequest.asset_label || (message.transactionRequest.asset === 'CUSD' ? 'USDm' : message.transactionRequest.asset || 'USDm')}
                         </p>
                       </div>
                     )}
@@ -782,16 +812,18 @@ export default function AIAssistantPage() {
                     <div className="space-y-2">
                       <p className="text-white/70 text-sm">Amount:</p>
                       <p className="text-white font-semibold">
-                        ${transactionStatus.amount.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 4,
-                        })} USDm
+                        ${typeof transactionStatus.amount === 'number'
+                          ? transactionStatus.amount.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 4,
+                            })
+                          : '0.00'} {txAssetLabel}
                       </p>
                     </div>
                     {transactionStatus.status === 'approving' && (
                       <div className="flex items-center gap-2 text-[#2BA3FF]">
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <p className="text-sm">Approving USDm...</p>
+                        <p className="text-sm">Approving {txAssetLabel}...</p>
                       </div>
                     )}
                     {transactionStatus.status === 'executing' && (
@@ -832,10 +864,12 @@ export default function AIAssistantPage() {
                   <h3 className="text-xl font-bold text-white">Transaction Successful!</h3>
                 </div>
                 <p className="text-white/70 text-sm mb-4">
-                  Your {transactionStatus.type} of ${transactionStatus.amount.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 4,
-                  })} USDm has been completed.
+                  Your {transactionStatus.type} of ${typeof transactionStatus.amount === 'number'
+                    ? transactionStatus.amount.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 4,
+                      })
+                    : '0.00'} USDm has been completed.
                 </p>
                 {transactionStatus.txHash && (
                   <div className="mb-4">
@@ -863,7 +897,47 @@ export default function AIAssistantPage() {
 
           {/* Chat Input - Fixed at bottom */}
           <div className="p-4 lg:p-6">
-            <div className="max-w-4xl mx-auto flex items-center gap-2 sm:gap-3">
+            <div className="max-w-4xl mx-auto space-y-3">
+              {/* Quick asset selector when a tx draft awaits asset choice */}
+              {txDraft && (
+                <div className="flex items-center justify-between gap-3 bg-white/5 border border-white/10 rounded-lg p-3">
+                  <div className="text-white/80 text-sm">
+                    Select asset for {txDraft.action}: ${typeof txDraft.amount === 'number' ? txDraft.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '0.00'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(['CUSD','USDC','USDT'] as const).map(sym => (
+                      <button
+                        key={sym}
+                        onClick={() => {
+                          const nextAsset = sym
+                          setTxAsset(nextAsset)
+                          setTxAssetLabel(nextAsset === 'CUSD' ? 'USDm' : nextAsset)
+                          setTxDecimals(nextAsset === 'USDC' || nextAsset === 'USDT' ? 6 : 18)
+                          // promote draft to active pending transaction
+                          setTransactionStatus({
+                            type: txDraft.action,
+                            amount: txDraft.amount,
+                            status: 'pending',
+                          })
+                          setTxDraft(null)
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              role: 'assistant',
+                              content: `Great — we'll use ${nextAsset === 'CUSD' ? 'USDm (cUSD)' : nextAsset} for this ${txDraft.action}.`,
+                              timestamp: new Date(),
+                            },
+                          ])
+                        }}
+                        className="px-3 py-1.5 rounded-md text-xs border border-white/10 text-white/80 hover:bg-white/10"
+                      >
+                        {sym === 'CUSD' ? 'USDm' : sym}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-2 sm:gap-3">
               <input
                 type="text"
                 value={input}
@@ -889,6 +963,7 @@ export default function AIAssistantPage() {
                 <Send className="w-5 h-5" />
                 )}
               </button>
+              </div>
             </div>
           </div>
         </main>
