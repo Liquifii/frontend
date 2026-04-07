@@ -23,10 +23,15 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
-    // Log to console with more details
-    console.error('Error stack:', error.stack)
-    console.error('Component stack:', errorInfo.componentStack)
+    if (process.env.NODE_ENV !== 'production') {
+      // Log verbose details only in development
+      // eslint-disable-next-line no-console
+      console.error('ErrorBoundary caught an error:', error, errorInfo)
+      // eslint-disable-next-line no-console
+      console.error('Error stack:', error.stack)
+      // eslint-disable-next-line no-console
+      console.error('Component stack:', errorInfo.componentStack)
+    }
   }
 
   render() {

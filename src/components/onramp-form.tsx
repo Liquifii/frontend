@@ -28,6 +28,8 @@ export default function OnRampForm() {
   const [selectedCountry, setSelectedCountry] = useState<string>('')
   const [amount, setAmount] = useState('')
   const [paymentChannel, setPaymentChannel] = useState<PaymentChannel | ''>('')
+  // Asset to receive on-chain. Default is USDC; choose CUSD to receive USDm
+  const [asset, setAsset] = useState<'USDC' | 'CUSD'>('USDC')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false)
@@ -130,6 +132,7 @@ export default function OnRampForm() {
           amount: parseFloat(amount),
           currency: 'local', // Amount is in local currency (NGN, KES, etc.)
           countryIsoCode: selectedCountry,
+          asset, // USDC by default; CUSD for USDm
           paymentChannel: paymentChannel || undefined,
           redirectUrl: redirectUrl,
           freezeAmount: false,
@@ -177,6 +180,32 @@ export default function OnRampForm() {
 
   return (
     <div className="space-y-4">
+      {/* Asset Selector */}
+      <div>
+        <label className="block text-white/70 text-sm mb-2">Receive Asset</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setAsset('USDC'); setError('') }}
+            disabled={loading}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              asset === 'USDC' ? 'bg-[#2BA3FF] text-white border border-[#2BA3FF]' : 'bg-white/5 text-white/70 hover:bg-white/10 border border-white/10'
+            }`}
+          >
+            USDC
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAsset('CUSD'); setError('') }}
+            disabled={loading}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              asset === 'CUSD' ? 'bg-[#2BA3FF] text-white border border-[#2BA3FF]' : 'bg-white/5 text-white/70 hover:bg-white/10 border border-white/10'
+            }`}
+          >
+            USDm
+          </button>
+        </div>
+      </div>
       {/* Country Selector */}
       <div className="relative" ref={countryDropdownRef}>
         <label className="block text-white/70 text-sm mb-2 flex items-center gap-2">
@@ -287,7 +316,7 @@ export default function OnRampForm() {
         </div>
         {selectedCountryData && (
           <p className="text-xs text-white/50 mt-1">
-            You'll receive cUSD in your wallet after payment
+            You'll receive {asset === 'USDC' ? 'USDC' : 'USDm'} in your wallet after payment
           </p>
         )}
       </div>
@@ -304,7 +333,7 @@ export default function OnRampForm() {
       {!isConnected && (
         <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
-          <p className="text-yellow-400 text-sm">Please connect your wallet to buy cUSD</p>
+          <p className="text-yellow-400 text-sm">Please connect your wallet to buy {asset === 'USDC' ? 'USDC' : 'USDm'}</p>
         </div>
       )}
 
@@ -328,7 +357,7 @@ export default function OnRampForm() {
           </>
         ) : (
           <>
-            Buy cUSD with {selectedCountryData?.currencyIsoCode || 'local currency'}
+            Buy {asset === 'USDC' ? 'USDC' : 'USDm'} with {selectedCountryData?.currencyIsoCode || 'local currency'}
             <ArrowRight className="w-4 h-4" />
           </>
         )}
@@ -337,7 +366,7 @@ export default function OnRampForm() {
       {/* Info Message */}
       <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
         <p className="text-blue-400 text-xs">
-          💡 You'll be redirected to Fonbnk to complete the payment. After payment, cUSD will be sent directly to your connected wallet.
+          💡 You'll be redirected to Fonbnk to complete the payment. After payment, {asset === 'USDC' ? 'USDC' : 'USDm'} will be sent directly to your connected wallet.
         </p>
       </div>
     </div>

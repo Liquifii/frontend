@@ -30,6 +30,8 @@ export default function OffRampForm() {
   const [selectedCountry, setSelectedCountry] = useState<string>('')
   const [amount, setAmount] = useState('')
   const [paymentChannel, setPaymentChannel] = useState<PaymentChannel | ''>('')
+  // Asset to sell on off-ramp (required by API)
+  const [asset, setAsset] = useState<'USDC' | 'CUSD' | 'USDT' | 'CKES' | 'CGHS'>('USDC')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false)
@@ -175,6 +177,7 @@ export default function OffRampForm() {
           amount: parseFloat(amount),
           currency: 'crypto', // Amount is in cUSD
           countryIsoCode: selectedCountry,
+          asset,
           paymentChannel: paymentChannel || undefined,
           redirectUrl: redirectUrl,
         }),
@@ -182,6 +185,11 @@ export default function OffRampForm() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))
+        // 400: show allowed assets when asset missing/invalid
+        if (res.status === 400 && (errorData.allowed || errorData.error)) {
+          const allowedList = Array.isArray(errorData.allowed) ? ` Allowed: ${errorData.allowed.join(', ')}` : ''
+          throw new Error(`${errorData.error || 'Invalid request.'}${allowedList}`)
+        }
         throw new Error(errorData.error || `HTTP ${res.status}`)
       }
 
@@ -220,6 +228,25 @@ export default function OffRampForm() {
 
   return (
     <div className="space-y-4">
+      {/* Asset Selector (Required) */}
+      <div>
+        <label className="block text-white/70 text-sm mb-2">Asset to sell</label>
+        <div className="flex gap-2 flex-wrap">
+          {(['USDC','CUSD','USDT','CKES','CGHS'] as const).map(sym => (
+            <button
+              key={sym}
+              type="button"
+              onClick={() => { setAsset(sym); setError('') }}
+              disabled={loading}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                asset === sym ? 'bg-[#2BA3FF] text.white border border-[#2BA3FF]' : 'bg-white/5 text-white/70 hover:bg-white/10 border border-white/10'
+              }`}
+            >
+              {sym === 'CUSD' ? 'USDm' : sym}
+            </button>
+          ))}
+        </div>
+      </div>
       {/* Country Selector */}
       <div className="relative" ref={countryDropdownRef}>
         <label className="block text-white/70 text-sm mb-2 flex items-center gap-2">
@@ -306,7 +333,7 @@ export default function OffRampForm() {
 
       {/* Amount Input */}
       <div>
-        <label className="block text-white/70 text-sm mb-2">Amount (USDm)</label>
+        <label className="block text-white/70 text-sm mb-2">Amount ({asset === 'CUSD' ? 'USDm' : asset})</label>
         <div className="relative">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg">
             $
@@ -323,7 +350,7 @@ export default function OffRampForm() {
                 setError('')
               }
             }}
-            placeholder="Enter amount in USDm"
+            placeholder={`Enter amount in ${asset === 'CUSD' ? 'USDm' : asset}`}
             disabled={loading || !selectedCountry}
             className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           />
@@ -336,16 +363,18 @@ export default function OffRampForm() {
         {isConnected && vaultBalance !== undefined && vaultBalance !== null && typeof vaultBalance === 'bigint' && (
           <div className="mt-1">
             <p className="text-xs text-white/50">
-              Available in vault: {formatBalance(vaultBalance)} USDm
+              Available in vault: {formatBalance(vaultBalance)} {asset === 'CUSD' ? 'USDm' : asset}
             </p>
             {amount && parseFloat(amount) > 0 && (() => {
               try {
-                const amountWei = parseUnits(amount, 18)
+                // USDm uses 18, USDC/USDT are 6; CKES/CGHS handled as 18 by default
+                const decimals = asset === 'USDC' || asset === 'USDT' ? 6 : 18
+                const amountWei = parseUnits(amount, decimals)
                 if (vaultBalance < amountWei) {
                   return (
                     <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
-                      Insufficient vault balance. You have {formatBalance(vaultBalance)} USDm in the vault, but trying to cash out {amount} USDm.
+                      Insufficient vault balance. You have {formatBalance(vaultBalance)} {asset === 'CUSD' ? 'USDm' : asset} in the vault, but trying to cash out {amount} {asset === 'CUSD' ? 'USDm' : asset}.
                     </p>
                   )
                 }

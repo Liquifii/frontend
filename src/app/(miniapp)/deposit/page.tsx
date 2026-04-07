@@ -21,9 +21,9 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { sdk } from '@farcaster/miniapp-sdk'
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi'
 import { parseUnits, formatUnits, type Address } from 'viem'
-import { AttestifyVaultContract, CUSD_ADDRESS } from '../../abi'
+import { AttestifyVaultContract, CUSD_ADDRESS, REGISTRY_ADDRESS, REGISTRY_ABI, TOKENS } from '../../abi'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import OnRampForm from '../../../components/onramp-form'
@@ -76,6 +76,7 @@ const isInMiniApp = (): boolean => {
 export default function DepositPage() {
   const router = useRouter()
   const [selectedTab, setSelectedTab] = useState<'fiat' | 'usdm'>('usdm')
+  const [selectedAsset, setSelectedAsset] = useState<'USDC' | 'USDT' | 'USDM'>('USDC')
   const [amount, setAmount] = useState('')
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [balanceHidden, setBalanceHidden] = useState(false)
@@ -85,10 +86,42 @@ export default function DepositPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const { address, isConnected } = useAccount()
+  const publicClient = usePublicClient()
 
-  // Read user's USDm balance
-  const { data: usdmBalance, refetch: refetchBalance } = useReadContract({
-    address: CUSD_ADDRESS as Address,
+  // Resolve vault via Registry for selected asset (read-only)
+  const selectedTokenAddress = useMemo(() => TOKENS[selectedAsset].address as Address, [selectedAsset])
+  const selectedTokenDecimals = useMemo(() => TOKENS[selectedAsset].decimals, [selectedAsset])
+  const selectedSymbol = useMemo(() => TOKENS[selectedAsset].symbol, [selectedAsset])
+  const minDepositUnits = useMemo(() => {
+    try {
+      return parseUnits('1', selectedTokenDecimals)
+    } catch {
+      return 0n
+    }
+  }, [selectedTokenDecimals])
+
+  const { data: resolvedVaultRaw } = useReadContract({
+    address: REGISTRY_ADDRESS as Address,
+    abi: REGISTRY_ABI,
+    functionName: 'getVault',
+    args: [selectedTokenAddress],
+    query: {
+      enabled: selectedTab === 'usdm', // only when on-token tab
+      refetchInterval: 15000,
+    },
+  })
+  // Fallback to legacy configured vault if registry returns zero address or undefined
+  const resolvedVault: Address | undefined = useMemo(() => {
+    const addr = typeof resolvedVaultRaw === 'string' ? (resolvedVaultRaw as Address) : undefined
+    if (!addr || /^0x0{40}$/i.test(addr)) {
+      return AttestifyVaultContract.address as Address
+    }
+    return addr
+  }, [resolvedVaultRaw])
+
+  // Read user's token balance (USDC/USDT)
+  const { data: tokenBalance, refetch: refetchBalance } = useReadContract({
+    address: selectedTokenAddress,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
@@ -103,54 +136,81 @@ export default function DepositPage() {
   const depositAmount = useMemo(() => {
     if (!amount || selectedTab !== 'usdm') return 0n
     try {
-      return parseUnits(amount, 18)
+      return parseUnits(amount, selectedTokenDecimals)
     } catch {
       return 0n
     }
-  }, [amount, selectedTab])
+  }, [amount, selectedTab, selectedTokenDecimals])
 
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: CUSD_ADDRESS as Address,
+    address: selectedTokenAddress,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: address && AttestifyVaultContract.address ? [address, AttestifyVaultContract.address as Address] : undefined,
+    args:
+      address && resolvedVault && typeof resolvedVault === 'string'
+        ? [address, resolvedVault as Address]
+        : undefined,
     query: {
-      enabled: !!address && isConnected && !!AttestifyVaultContract.address,
+      enabled: !!address && isConnected && typeof resolvedVault === 'string',
     },
   })
 
   // Read user's vault balance (shares)
   const { data: userShares, refetch: refetchShares } = useReadContract({
-    address: AttestifyVaultContract.address as Address,
+    address: (typeof resolvedVault === 'string' ? (resolvedVault as Address) : undefined) as Address,
     abi: AttestifyVaultContract.AttestifyVault,
     functionName: 'shares',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && isConnected,
+      enabled: !!address && isConnected && typeof resolvedVault === 'string',
       refetchInterval: 10000,
     },
   })
 
-  // Read user's vault balance in assets
+  // Read user's vault asset balance directly from vault
   const { data: userVaultBalance, refetch: refetchVaultBalance } = useReadContract({
-    address: AttestifyVaultContract.address as Address,
+    address: (typeof resolvedVault === 'string' ? (resolvedVault as Address) : undefined) as Address,
     abi: AttestifyVaultContract.AttestifyVault,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && isConnected,
+      enabled: !!address && isConnected && typeof resolvedVault === 'string',
       refetchInterval: 10000,
     },
   })
 
   // Read total vault assets
   const { data: totalAssets, refetch: refetchTotalAssets } = useReadContract({
-    address: AttestifyVaultContract.address as Address,
+    address: (typeof resolvedVault === 'string' ? (resolvedVault as Address) : undefined) as Address,
     abi: AttestifyVaultContract.AttestifyVault,
     functionName: 'totalAssets',
     query: {
-      enabled: isConnected,
+      enabled: isConnected && typeof resolvedVault === 'string',
       refetchInterval: 10000,
+    },
+  })
+
+  // Preview minted shares for the entered deposit amount to guard against too-small deposits
+  const { data: previewShares } = useReadContract({
+    address: (typeof resolvedVault === 'string' ? (resolvedVault as Address) : undefined) as Address,
+    abi: AttestifyVaultContract.AttestifyVault,
+    functionName: 'convertToShares',
+    args: depositAmount > 0n ? [depositAmount] : undefined,
+    query: {
+      enabled: !!address && isConnected && typeof resolvedVault === 'string' && depositAmount > 0n,
+      refetchInterval: 7000,
+    },
+  })
+
+  // Minimum assets that would mint 1 share (approx lower bound for a non-zero-mint deposit)
+  const { data: minAssetsForOneShare } = useReadContract({
+    address: (typeof resolvedVault === 'string' ? (resolvedVault as Address) : undefined) as Address,
+    abi: AttestifyVaultContract.AttestifyVault,
+    functionName: 'convertToAssets',
+    args: [1n],
+    query: {
+      enabled: isConnected && typeof resolvedVault === 'string',
+      refetchInterval: 15000,
     },
   })
 
@@ -284,6 +344,11 @@ export default function DepositPage() {
       setErrorMessage('Please enter a valid amount')
       return
     }
+    // Enforce per-asset minimum before approve
+    if (depositAmount < minDepositUnits) {
+      setErrorMessage(`Minimum deposit is 1 ${selectedSymbol}. Please increase the amount.`)
+      return
+    }
 
     setTxStatus('approving')
     setErrorMessage('')
@@ -294,17 +359,23 @@ export default function DepositPage() {
     const maxApproval = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
     
     approve({
-      address: CUSD_ADDRESS as Address,
+      address: selectedTokenAddress,
       abi: ERC20_ABI,
       functionName: 'approve',
-      args: [AttestifyVaultContract.address as Address, maxApproval],
+      args: [(resolvedVault as Address), maxApproval],
     })
   }
 
   // Handle deposit
-  const handleDeposit = () => {
+  const handleDeposit = async () => {
     if (!address || !depositAmount || depositAmount === 0n) {
       setErrorMessage('Please enter a valid amount')
+      return
+    }
+    // Enforce per-asset minimum
+    if (depositAmount < minDepositUnits) {
+      setErrorMessage(`Minimum deposit is 1 ${selectedSymbol}.`)
+      setTxStatus('idle')
       return
     }
 
@@ -315,12 +386,38 @@ export default function DepositPage() {
       return
     }
 
+    if (!resolvedVault || typeof resolvedVault !== 'string') {
+      setErrorMessage('Vault not resolved for selected asset.')
+      setTxStatus('idle')
+      return
+    }
+
+    // Guard against rounding-to-zero shares which can trigger InvalidAmount reverts
+    const isTooSmallByPreview = previewShares !== undefined && typeof previewShares === 'bigint' && previewShares === 0n
+    const isTooSmallByMinAssets = typeof minAssetsForOneShare === 'bigint' && depositAmount < minAssetsForOneShare
+    if (isTooSmallByPreview || isTooSmallByMinAssets) {
+      const minDisplay = (() => {
+        try {
+          if (typeof minAssetsForOneShare === 'bigint') {
+            return `${Number(formatUnits(minAssetsForOneShare, selectedTokenDecimals)).toFixed(4)} ${selectedSymbol}`
+          }
+        } catch {}
+        // Fallback to known UX minimum: $1 in the selected token
+        return `1.0000 ${selectedSymbol}`
+      })()
+      const msg = `Amount too small for this vault. Minimum to mint 1 share is about ${minDisplay}.`
+      setErrorMessage(msg)
+      setTxStatus('idle')
+      return
+    }
+
+    // Ready to prompt wallet; set state just before sending tx
     setTxStatus('depositing')
     setErrorMessage('')
     resetDeposit() // Reset any previous errors
 
     deposit({
-      address: AttestifyVaultContract.address as Address,
+      address: resolvedVault as Address,
       abi: AttestifyVaultContract.AttestifyVault,
       functionName: 'deposit',
       args: [depositAmount],
@@ -331,7 +428,7 @@ export default function DepositPage() {
   const formatAmount = (value: bigint | undefined) => {
     if (value === undefined || value === null) return '0.00'
     try {
-      const formatted = formatUnits(value, 18)
+      const formatted = formatUnits(value, selectedTokenDecimals)
       const num = parseFloat(formatted)
       // For very large numbers (like max approval), show "Max"
       if (num >= 1e15) {
@@ -415,7 +512,7 @@ export default function DepositPage() {
         clearTimeout(timer3)
       }
     }
-  }, [isDepositSuccess, depositHash, refetchBalance, refetchShares, refetchVaultBalance, refetchAllowance, refetchTotalAssets, refetchDeposits, refetchWithdrawals])
+  }, [isDepositSuccess, depositHash, refetchBalance, refetchShares, refetchAllowance, refetchTotalAssets, refetchDeposits, refetchWithdrawals])
 
   // Handle errors from writeContract hooks
   useEffect(() => {
@@ -433,16 +530,17 @@ export default function DepositPage() {
   useEffect(() => {
     if (depositError) {
       setTxStatus('error')
-      let errorMsg = depositError.message || 'Deposit failed. Please check your wallet.'
-      
-      // Check for specific allowance error
-      if (errorMsg.includes('insufficient allowance') || errorMsg.includes('allowance')) {
-        errorMsg = 'Insufficient allowance. Please approve USDm first by clicking "Approve USDm".'
-        // Refetch allowance to update the UI
+      // Map on-chain/viem errors to user-friendly copy
+      const raw = (depositError.message || '').toLowerCase()
+      let friendly = 'Deposit failed. Please try again.'
+      if (raw.includes('allowance')) {
+        friendly = `Insufficient allowance. Please approve ${selectedSymbol} first.`
         refetchAllowance()
+      } else if (raw.includes('balance')) {
+        friendly = `Insufficient wallet balance.`
+        refetchBalance()
       }
-      
-      setErrorMessage(errorMsg)
+      setErrorMessage(friendly)
       // Reset after showing error
       setTimeout(() => {
         resetDeposit()
@@ -535,7 +633,7 @@ export default function DepositPage() {
       
       return {
         label,
-        value: parseFloat(formatUnits(runningBalance, 18)),
+        value: parseFloat(formatUnits(runningBalance, selectedTokenDecimals)),
         date: tx.date,
       }
     })
@@ -544,7 +642,7 @@ export default function DepositPage() {
     if (userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint' && userVaultBalance > BigInt(0)) {
       history.push({
         label: 'Now',
-        value: parseFloat(formatUnits(userVaultBalance, 18)),
+        value: parseFloat(formatUnits(userVaultBalance, selectedTokenDecimals)),
         date: new Date(),
       })
     }
@@ -556,13 +654,13 @@ export default function DepositPage() {
       // If no history but have balance, show current balance
       return [{
         label: 'Now',
-        value: parseFloat(formatUnits(userVaultBalance, 18)),
+        value: parseFloat(formatUnits(userVaultBalance, selectedTokenDecimals)),
         date: new Date(),
       }]
     }
 
     return []
-  }, [depositedData, withdrawalData, userVaultBalance])
+  }, [depositedData, withdrawalData, userVaultBalance, selectedTokenDecimals])
 
   // Chart dimensions - enlarged to match Figma
   const chartWidth = 800
@@ -606,7 +704,6 @@ export default function DepositPage() {
     <div style={{ backgroundColor: '#0E0E11', minHeight: '100vh' }}>
 
       <div className="flex">
-
         {/* Main Content */}
         <main className="flex-1 p-4 lg:p-6" style={{ backgroundColor: '#0E0E11' }}>
           <div className="max-w-6xl mx-auto">
@@ -675,6 +772,48 @@ export default function DepositPage() {
                     <OnRampForm />
                   ) : (
                     <>
+                      {/* Asset Selector + Resolved Vault */}
+                      <div className="mb-4">
+                        <label className="block text-white/70 text-sm mb-2">Asset</label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedAsset('USDC')}
+                            className={`px-3 py-2 rounded-md border transition-colors text-sm ${
+                              selectedAsset === 'USDC' ? 'border-[#2BA3FF] text-white bg-[#2BA3FF]/10' : 'border-white/10 text-white/80 hover:bg-white/5'
+                            }`}
+                          >
+                            USDC
+                          </button>
+                          <button
+                            onClick={() => setSelectedAsset('USDT')}
+                            className={`px-3 py-2 rounded-md border transition-colors text-sm ${
+                              selectedAsset === 'USDT' ? 'border-[#2BA3FF] text-white bg-[#2BA3FF]/10' : 'border-white/10 text-white/80 hover:bg-white/5'
+                            }`}
+                          >
+                            USDT
+                          </button>
+                          <button
+                            onClick={() => setSelectedAsset('USDM')}
+                            className={`px-3 py-2 rounded-md border transition-colors text-sm ${
+                              selectedAsset === 'USDM' ? 'border-[#2BA3FF] text-white bg-[#2BA3FF]/10' : 'border-white/10 text-white/80 hover:bg-white/5'
+                            }`}
+                          >
+                            USDm
+                          </button>
+                        </div>
+                        {resolvedVault && (
+                          <p className="mt-2 text-xs text-white/50">
+                            Vault (proxy):{' '}
+                            <span className="text-white">
+                              {resolvedVault.slice(0, 6)}…{resolvedVault.slice(-4)}
+                            </span>
+                          </p>
+                        )}
+                        <p className="mt-1 text-xs text-white/40">
+                          Decimals: {selectedTokenDecimals} — approvals and deposits will use this.
+                        </p>
+                      </div>
+
                       {/* Amount Input */}
                       <div className="mb-6">
                         <label className="block text-white/70 text-sm mb-2">Amount</label>
@@ -695,14 +834,19 @@ export default function DepositPage() {
                                 setErrorMessage('')
                               }
                             }}
-                            placeholder="Enter amount in USDm"
+                            placeholder={`Enter amount in ${selectedSymbol}`}
                             className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#2BA3FF] transition-colors"
                             disabled={!isConnected || txStatus === 'approving' || txStatus === 'depositing'}
                           />
                         </div>
                         {amount && depositAmount > BigInt(0) && (
                           <p className="text-xs text-white/50 mt-1">
-                            ≈ {formatAmount(depositAmount)} USDm
+                            ≈ {formatAmount(depositAmount)} {selectedSymbol}
+                          </p>
+                        )}
+                        {amount && depositAmount > BigInt(0) && depositAmount < minDepositUnits && (
+                          <p className="text-xs text-red-400 mt-1">
+                            Minimum deposit is 1 {selectedSymbol}.
                           </p>
                         )}
                       </div>
@@ -711,12 +855,12 @@ export default function DepositPage() {
                       <div className="mb-6">
                         <p className="text-white/60 text-sm">
                           Deposit Range: <span className="text-white">
-                            Min: 1 USDm | Max: 100,000 USDm
+                            Min: 1 {selectedSymbol} | Max: 100,000 {selectedSymbol}
                           </span>
                         </p>
-                        {isConnected && usdmBalance !== undefined && (
+                        {isConnected && tokenBalance !== undefined && (
                           <p className="text-white/50 text-xs mt-1">
-                            Available: {formatAmount(usdmBalance)} USDm
+                            Available: {formatAmount(tokenBalance)} {selectedSymbol}
                           </p>
                         )}
                       </div>
@@ -748,23 +892,23 @@ export default function DepositPage() {
                       {/* Balance Display - Always show when connected */}
                       {isConnected && (
                         <div className="mb-4">
-                          {usdmBalance === undefined ? (
+                          {tokenBalance === undefined ? (
                             <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2">
                               <Loader2 className="w-5 h-5 text-yellow-400 flex-shrink-0 animate-spin" />
                               <p className="text-yellow-400 text-sm">Loading balance...</p>
                             </div>
-                          ) : depositAmount > BigInt(0) && usdmBalance < depositAmount ? (
+                          ) : depositAmount > BigInt(0) && tokenBalance < depositAmount ? (
                             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
                               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
                               <p className="text-red-400 text-sm break-words">
-                                Insufficient balance. You have {formatAmount(usdmBalance)} USDm
+                                Insufficient balance. You have {formatAmount(tokenBalance)} {selectedSymbol}
                               </p>
                             </div>
                           ) : (
                             <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                              <p className="text-blue-400 text-sm break-words">
-                                Wallet Balance: {formatAmount(usdmBalance)} USDm
-                              </p>
+                            <p className="text-blue-400 text-sm break-words">
+                              Wallet Balance: {formatAmount(tokenBalance)} {selectedSymbol}
+                            </p>
                             </div>
                           )}
                         </div>
@@ -775,9 +919,9 @@ export default function DepositPage() {
                         <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                           <p className="text-blue-400 text-sm break-words">
                             {needsApproval ? (
-                              <>⚠️ Approval needed: {formatAmount(allowance as bigint)} USDm approved, need {formatAmount(depositAmount)} USDm</>
+                              <>⚠️ Approval needed: {formatAmount(allowance as bigint)} {selectedSymbol} approved, need {formatAmount(depositAmount)} {selectedSymbol}</>
                             ) : (
-                              <>✅ Sufficient allowance: {formatAmount(allowance as bigint)} USDm approved</>
+                              <>✅ Sufficient allowance: {formatAmount(allowance as bigint)} {selectedSymbol} approved</>
                             )}
                           </p>
                         </div>
@@ -790,7 +934,7 @@ export default function DepositPage() {
                           !isConnected ||
                           !amount ||
                           depositAmount === BigInt(0) ||
-                          (usdmBalance !== undefined && typeof usdmBalance === 'bigint' && usdmBalance < depositAmount) ||
+                          (tokenBalance !== undefined && typeof tokenBalance === 'bigint' && tokenBalance < depositAmount) ||
                           txStatus === 'approving' ||
                           txStatus === 'depositing' ||
                           isWaitingApproval ||
@@ -810,7 +954,7 @@ export default function DepositPage() {
                           </>
                         ) : needsApproval ? (
                           <>
-                            Approve USDm
+                            Approve {selectedSymbol}
                             <AlertCircle className="w-4 h-4" />
                           </>
                         ) : (
@@ -854,8 +998,12 @@ export default function DepositPage() {
                           <div>
                             <p className="text-4xl font-bold text-white">
                               {userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint'
-                                ? `$${parseFloat(formatUnits(userVaultBalance, 18)).toFixed(2)}`
-                                : '$0.00'}
+                                ? (() => {
+                                    const val = parseFloat(formatUnits(userVaultBalance, selectedTokenDecimals))
+                                    const precision = Math.max(6, Math.min(8, selectedTokenDecimals))
+                                    return `${val.toFixed(precision)} ${selectedSymbol}`
+                                  })()
+                                : `0.000000 ${selectedSymbol}`}
                             </p>
                             {userShares !== undefined && userShares !== null && (
                               <p className="text-sm text-white/60 mt-1">

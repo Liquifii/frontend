@@ -24,8 +24,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAccount, useReadContract } from 'wagmi'
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { parseUnits, formatUnits, type Address } from 'viem'
-import { AttestifyVaultContract, CUSD_ADDRESS } from '../../abi'
+import { parseUnits, formatUnits, type Address, createPublicClient, http } from 'viem'
+import { celo } from 'viem/chains'
+import { AttestifyVaultContract, CUSD_ADDRESS, TOKENS, REGISTRY_ADDRESS, REGISTRY_ABI, StrategyContract } from '../../abi'
 import { sdk } from '@farcaster/miniapp-sdk'
 
 // Utility to detect if we're in Farcaster MiniApp
@@ -97,7 +98,9 @@ type Message = {
   timestamp: Date
   transactionRequest?: {
     action: 'deposit' | 'withdraw'
-    amount_usdm: number
+    amount: number
+    asset?: 'USDC' | 'USDT' | 'CUSD'
+    asset_label?: string
   }
   txHash?: string
 }
@@ -114,6 +117,17 @@ export default function AIAssistantPage() {
   const router = useRouter()
   const { address, isConnected } = useAccount()
   const { writeContract, data: txHash, error: writeError, reset: resetWrite } = useWriteContract()
+  const [txAsset, setTxAsset] = useState<'USDC' | 'USDT' | 'CUSD'>('CUSD')
+  const [txAssetLabel, setTxAssetLabel] = useState<string>('USDm')
+  const [txDecimals, setTxDecimals] = useState<number>(18)
+  const tokenAddress = txAsset === 'USDC' ? (TOKENS.USDC.address as Address) : txAsset === 'USDT' ? (TOKENS.USDT.address as Address) : (CUSD_ADDRESS as Address)
+  const { data: resolvedVault } = useReadContract({
+    address: REGISTRY_ADDRESS as Address,
+    abi: REGISTRY_ABI,
+    functionName: 'getVault',
+    args: [tokenAddress],
+    query: { enabled: true, refetchInterval: 15000 },
+  })
   
   // Read user's wallet USDm balance
   const { data: walletBalance, refetch: refetchWalletBalance } = useReadContract({
@@ -147,14 +161,93 @@ export default function AIAssistantPage() {
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [conversationId] = useState(() => `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+  const [conversationId] = useState(() => {
+    const storageKey = 'agent_conversation_id'
+    try {
+      if (typeof window !== 'undefined') {
+        const existing = window.localStorage.getItem(storageKey)
+        if (existing) return existing
+        const id = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+        window.localStorage.setItem(storageKey, id)
+        return id
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return `conv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  })
   const [transactionStatus, setTransactionStatus] = useState<TransactionStatus | null>(null)
   const [approveHash, setApproveHash] = useState<`0x${string}` | undefined>()
   const [vaultHash, setVaultHash] = useState<`0x${string}` | undefined>()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const hasUserInteracted = useRef(false)
-  
+  const [lastUserMessage, setLastUserMessage] = useState<string>('')
+  // When agent requests a tx without specifying asset, we stage a draft until user picks the asset
+  const [txDraft, setTxDraft] = useState<{ action: 'deposit' | 'withdraw'; amount: number } | null>(null)
+  const [infoDraft, setInfoDraft] = useState<null | { kind: 'balance' | 'apy' }>(null)
+  // Infer asset from user text when backend omitted asset but user specified it
+  const inferAssetFromText = (text: string): 'USDC' | 'USDT' | 'CUSD' | undefined => {
+    try {
+      const lower = text.toLowerCase()
+      if (/(usdc)/.test(lower)) return 'USDC'
+      if (/(usdt)/.test(lower)) return 'USDT'
+      if (/(usdm|\bcusd\b|c\s*usd|c-usd)/.test(lower)) return 'CUSD'
+    } catch {}
+    return undefined
+  }
+  const inferAmountFromText = (text: string): number | undefined => {
+    try {
+      const m = text.toLowerCase().match(/(?:\$?\s*)(\d+(?:\.\d+)?)/)
+      return m ? Number(m[1]) : undefined
+    } catch {
+      return undefined
+    }
+  }
+  // Simple snapshot reader for balances/APY per asset
+  const publicClient = createPublicClient({ chain: celo, transport: http('https://forno.celo.org') })
+  const ERC20_READ_ABI = [
+    { inputs: [{ name: 'account', type: 'address' }], name: 'balanceOf', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' },
+  ] as const
+  async function loadAssetSnapshot(asset: 'USDC' | 'USDT' | 'CUSD', user: Address) {
+    const tokenAddr = asset === 'USDC' ? (TOKENS.USDC.address as Address) : asset === 'USDT' ? (TOKENS.USDT.address as Address) : (CUSD_ADDRESS as Address)
+    const decimals = asset === 'USDC' || asset === 'USDT' ? 6 : 18
+    const vault = (await publicClient.readContract({
+      address: REGISTRY_ADDRESS as Address,
+      abi: REGISTRY_ABI,
+      functionName: 'getVault',
+      args: [tokenAddr],
+    })) as Address
+    const walletBal = (await publicClient.readContract({
+      address: tokenAddr,
+      abi: ERC20_READ_ABI,
+      functionName: 'balanceOf',
+      args: [user],
+    })) as bigint
+    const vaultBal = (await publicClient.readContract({
+      address: vault,
+      abi: AttestifyVaultContract.AttestifyVault,
+      functionName: 'balanceOf',
+      args: [user],
+    })) as bigint
+    const strategy = (await publicClient.readContract({
+      address: vault,
+      abi: AttestifyVaultContract.AttestifyVault,
+      functionName: 'strategy',
+    })) as Address
+    const apyBps = (await publicClient.readContract({
+      address: strategy,
+      abi: StrategyContract.Strategy,
+      functionName: 'getCurrentAPY',
+    })) as bigint
+    return {
+      wallet: Number(formatUnits(walletBal, decimals)),
+      vault: Number(formatUnits(vaultBal, decimals)),
+      apy: Number(apyBps) / 100,
+      decimals,
+      symbol: asset === 'CUSD' ? 'USDm' : asset,
+    }
+  }
   // SelfClaw trust verification
   const [trustData, setTrustData] = useState<{
     configured: boolean
@@ -243,7 +336,7 @@ export default function AIAssistantPage() {
   const formatAmount = (value: bigint | undefined) => {
     if (value === undefined || value === null) return '0.00'
     try {
-      const formatted = formatUnits(value, 18)
+      const formatted = formatUnits(value, txDecimals)
       const num = parseFloat(formatted)
       if (num >= 1000) {
         return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
@@ -261,7 +354,7 @@ export default function AIAssistantPage() {
   const validateTransaction = (): string | null => {
     if (!transactionStatus) return 'No transaction to validate'
 
-    const amountWei = parseUnits(transactionStatus.amount.toString(), 18)
+    const amountWei = parseUnits(transactionStatus.amount.toString(), txDecimals)
 
     // Check minimum deposit/withdrawal
     if (amountWei < MIN_DEPOSIT_WEI) {
@@ -278,7 +371,7 @@ export default function AIAssistantPage() {
       if (walletBalance !== undefined && typeof walletBalance === 'bigint') {
         if (walletBalance < amountWei) {
           const balanceFormatted = formatAmount(walletBalance)
-          return `Insufficient balance. You have ${balanceFormatted} USDm, but trying to deposit ${transactionStatus.amount} USDm.`
+          return `Insufficient balance. You have ${balanceFormatted} ${txAssetLabel}, but trying to deposit ${transactionStatus.amount} ${txAssetLabel}.`
         }
       }
     }
@@ -288,7 +381,7 @@ export default function AIAssistantPage() {
       if (vaultBalance !== undefined && typeof vaultBalance === 'bigint') {
         if (vaultBalance < amountWei) {
           const balanceFormatted = formatAmount(vaultBalance)
-          return `Insufficient vault balance. You have ${balanceFormatted} USDm in the vault, but trying to withdraw ${transactionStatus.amount} USDm.`
+          return `Insufficient vault balance. You have ${balanceFormatted} ${txAssetLabel} in the vault, but trying to withdraw ${transactionStatus.amount} ${txAssetLabel}.`
         }
       }
     }
@@ -399,11 +492,11 @@ export default function AIAssistantPage() {
     try {
       setTransactionStatus((prev) => prev ? { ...prev, status: 'executing' } : null)
 
-      const amountWei = parseUnits(transactionStatus.amount.toString(), 18)
+      const amountWei = parseUnits(transactionStatus.amount.toString(), txDecimals)
 
       if (transactionStatus.type === 'deposit') {
         writeContract({
-          address: AttestifyVaultContract.address as Address,
+          address: (typeof resolvedVault === 'string' && !/^0x0{40}$/i.test(resolvedVault as string) ? (resolvedVault as Address) : (AttestifyVaultContract.address as Address)),
           abi: VAULT_ABI,
           functionName: 'deposit',
           args: [amountWei],
@@ -412,7 +505,7 @@ export default function AIAssistantPage() {
         // Withdraw with 1% slippage tolerance
         const minAssetsOut = (amountWei * BigInt(99)) / BigInt(100)
         writeContract({
-          address: AttestifyVaultContract.address as Address,
+          address: (typeof resolvedVault === 'string' && !/^0x0{40}$/i.test(resolvedVault as string) ? (resolvedVault as Address) : (AttestifyVaultContract.address as Address)),
           abi: VAULT_ABI,
           functionName: 'withdraw',
           args: [amountWei, minAssetsOut],
@@ -432,10 +525,12 @@ export default function AIAssistantPage() {
     )
 
     // Add success message to chat
-    const formattedAmount = transactionStatus.amount.toLocaleString(undefined, {
+    const formattedAmount = typeof transactionStatus.amount === 'number'
+      ? transactionStatus.amount.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 4,
-    })
+      })
+      : '0.00'
     setMessages((prev) => [
       ...prev,
       {
@@ -450,6 +545,20 @@ export default function AIAssistantPage() {
     setTimeout(() => {
       setTransactionStatus(null)
     }, 5000)
+
+    // Best-effort feedback to agent backend
+    try {
+      await fetch('/api/agent/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tx_hash: txHash,
+          success: true,
+        }),
+      })
+    } catch {
+      // ignore feedback errors
+    }
   }
 
   const handleSendMessage = async () => {
@@ -478,11 +587,62 @@ export default function AIAssistantPage() {
 
     setMessages((prev) => [...prev, userMessage])
     const messageContent = input.trim()
+    setLastUserMessage(messageContent)
     setInput('')
     setIsLoading(true)
 
     // Send message to AI agent
     try {
+      // Fast-path: handle balance/APY/earnings locally when asset is explicit to avoid backend 500s
+      const lc = messageContent.toLowerCase()
+      const isBalance = /balance/.test(lc)
+      const isApy = /(apy|yield)/.test(lc)
+      const isEarnings = /(earning|earnings)/.test(lc)
+      const isInfoQuery = isBalance || isApy || isEarnings
+      const inferredAsset = inferAssetFromText(messageContent)
+      if (isInfoQuery && inferredAsset) {
+        if (!address) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: 'Please connect your wallet to check balances and APY.',
+              timestamp: new Date(),
+            },
+          ])
+          return
+        }
+        try {
+          const snap = await loadAssetSnapshot(inferredAsset, address as Address)
+          const daily = isEarnings || isApy ? (snap.vault * (snap.apy / 100)) / 365 : null
+          const reply =
+            isBalance && !isApy && !isEarnings
+              ? `For ${snap.symbol}: Vault balance ${snap.vault.toFixed(6)} ${snap.symbol}, Wallet ${snap.wallet.toFixed(6)} ${snap.symbol}.`
+              : isApy && !isEarnings
+              ? `Current APY for ${snap.symbol}: ${snap.apy.toFixed(2)}%. Estimated daily earnings: ${daily?.toFixed(6) ?? '0.000000'} ${snap.symbol}/day (on your vault balance of ${snap.vault.toFixed(6)} ${snap.symbol}).`
+              : isEarnings && !isApy
+              ? `Estimated daily earnings for ${snap.symbol}: ${daily?.toFixed(6) ?? '0.000000'} ${snap.symbol}/day at ${snap.apy.toFixed(2)}% APY (on your vault balance of ${snap.vault.toFixed(6)} ${snap.symbol}).`
+              : `For ${snap.symbol}: APY ${snap.apy.toFixed(2)}% — estimated daily earnings ${daily?.toFixed(6) ?? '0.000000'} ${snap.symbol}/day; Vault ${snap.vault.toFixed(6)} ${snap.symbol}, Wallet ${snap.wallet.toFixed(6)} ${snap.symbol}.`
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: reply,
+              timestamp: new Date(),
+            },
+          ])
+          return
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      // If info query without asset, prompt chips and skip backend
+      if (isInfoQuery && !inferredAsset) {
+        setInfoDraft({ kind: isApy || isEarnings ? 'apy' : 'balance' })
+        setIsLoading(false)
+        return
+      }
+
       const response = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -499,32 +659,103 @@ export default function AIAssistantPage() {
       }
 
       const data = await response.json()
-      const assistantContent = data.reply || 'I couldn\'t generate a response. Please try again.'
+      const tx = data.transactionRequest
+      // Only treat "missing asset" as actionable when the backend is asking for a tx (deposit/withdraw)
+      const missingAsset = !!(tx && (tx.action === 'deposit' || tx.action === 'withdraw') && !tx.asset)
 
+      // Handle balance/APY questions first to avoid emitting a generic reply and a second per-asset answer
+      {
+        const lower = messageContent.toLowerCase()
+        const isBalance = /balance/.test(lower)
+        const isApy = /(apy|yield|earnings)/.test(lower)
+        const isBalanceOrApy = isBalance || isApy
+        const inferred = inferAssetFromText(messageContent)
+        if (!tx && isBalanceOrApy && inferred && address) {
+          try {
+            const snap = await loadAssetSnapshot(inferred, address as Address)
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: isApy
+                  ? `Current APY for ${snap.symbol}: ${snap.apy.toFixed(2)}%.`
+                  : `For ${snap.symbol}: Vault balance ${snap.vault.toFixed(6)} ${snap.symbol}, Wallet ${snap.wallet.toFixed(6)} ${snap.symbol}.`,
+                timestamp: new Date(),
+              },
+            ])
+          } catch {
+            // fall through to generic reply if snapshot fails
+          }
+          return
+        }
+        if (!tx && isBalanceOrApy && !inferred) {
+          // Ask user to pick an asset for balance/APY queries
+          setInfoDraft({ kind: isApy ? 'apy' : 'balance' })
+          return
+        }
+      }
+
+      // If backend omitted asset but the user's message clearly includes it, proceed immediately
+      if (missingAsset) {
+        const inferredAsset = inferAssetFromText(messageContent)
+        const inferredAmount = data.transactionRequest?.amount ?? inferAmountFromText(messageContent)
+        if (inferredAsset && typeof inferredAmount === 'number') {
+          const nextAsset = inferredAsset
+          setTxAsset(nextAsset)
+          setTxAssetLabel(nextAsset === 'CUSD' ? 'USDm' : nextAsset)
+          setTxDecimals(nextAsset === 'USDC' || nextAsset === 'USDT' ? 6 : 18)
+          setTransactionStatus({
+            type: data.transactionRequest!.action,
+            amount: inferredAmount,
+            status: 'pending',
+          })
+          return
+        }
+      }
+
+      const assistantContent = missingAsset
+        ? 'Which asset would you like to use for this transaction? Please select USDm, USDC, or USDT.'
+        : (data.reply || 'I couldn\'t generate a response. Please try again.')
+
+      // Only attach transactionRequest to the chat when asset is specified
       const assistantMessage: Message = {
         role: 'assistant',
         content: assistantContent,
         timestamp: new Date(),
-        transactionRequest: data.transactionRequest,
+        transactionRequest: missingAsset ? undefined : data.transactionRequest,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
 
-      // Handle transaction request
-      if (data.transactionRequest) {
-        const { action, amount_usdm } = data.transactionRequest
-        setTransactionStatus({
-          type: action,
-          amount: amount_usdm,
-          status: 'pending',
-        })
+      // Handle transaction request workflow
+      if (tx && (tx.action === 'deposit' || tx.action === 'withdraw')) {
+        const { action, amount, asset, asset_label } = tx
+        if (!asset) {
+          // Stage draft and show quick chips; user picks the asset in UI
+          setTxDraft({ action, amount })
+        } else {
+          // Normalize asset string from backend: cusd|usdc|usdt or uppercase
+          const normalized = String(asset).toLowerCase()
+          const nextAsset = normalized === 'usdc' ? 'USDC' : normalized === 'usdt' ? 'USDT' : 'CUSD'
+          setTxAsset(nextAsset)
+          setTxAssetLabel(asset_label || (nextAsset === 'CUSD' ? 'USDm' : nextAsset))
+          setTxDecimals(nextAsset === 'USDC' || nextAsset === 'USDT' ? 6 : 18)
+          setTransactionStatus({
+            type: action,
+            amount,
+            status: 'pending',
+          })
+        }
       }
     } catch (error) {
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          content:
+            process.env.NODE_ENV !== 'production'
+              ? `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`
+              : 'Sorry, something went wrong. Please try again.',
           timestamp: new Date(),
         },
       ])
@@ -549,10 +780,10 @@ export default function AIAssistantPage() {
       const maxApproval = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
 
       writeContract({
-        address: CUSD_ADDRESS as Address,
+        address: tokenAddress,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [AttestifyVaultContract.address as Address, maxApproval],
+        args: [(typeof resolvedVault === 'string' && !/^0x0{40}$/i.test(resolvedVault as string) ? (resolvedVault as Address) : (AttestifyVaultContract.address as Address)), maxApproval],
       })
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Approval failed'
@@ -723,10 +954,10 @@ export default function AIAssistantPage() {
                     {message.transactionRequest && (
                       <div className="mt-3 pt-3 border-t border-white/20">
                         <p className="text-xs text-white/70 mb-2">
-                          Transaction Request: {message.transactionRequest.action} ${message.transactionRequest.amount_usdm?.toLocaleString(undefined, {
+                          Transaction Request: {message.transactionRequest.action} ${message.transactionRequest.amount?.toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 4,
-                          })} USDm
+                          })} {message.transactionRequest.asset_label || (message.transactionRequest.asset === 'CUSD' ? 'USDm' : message.transactionRequest.asset || 'USDm')}
                         </p>
                       </div>
                     )}
@@ -782,16 +1013,18 @@ export default function AIAssistantPage() {
                     <div className="space-y-2">
                       <p className="text-white/70 text-sm">Amount:</p>
                       <p className="text-white font-semibold">
-                        ${transactionStatus.amount.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 4,
-                        })} USDm
+                        ${typeof transactionStatus.amount === 'number'
+                          ? transactionStatus.amount.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 4,
+                            })
+                          : '0.00'} {txAssetLabel}
                       </p>
                     </div>
                     {transactionStatus.status === 'approving' && (
                       <div className="flex items-center gap-2 text-[#2BA3FF]">
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <p className="text-sm">Approving USDm...</p>
+                        <p className="text-sm">Approving {txAssetLabel}...</p>
                       </div>
                     )}
                     {transactionStatus.status === 'executing' && (
@@ -832,10 +1065,12 @@ export default function AIAssistantPage() {
                   <h3 className="text-xl font-bold text-white">Transaction Successful!</h3>
                 </div>
                 <p className="text-white/70 text-sm mb-4">
-                  Your {transactionStatus.type} of ${transactionStatus.amount.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 4,
-                  })} USDm has been completed.
+                  Your {transactionStatus.type} of ${typeof transactionStatus.amount === 'number'
+                    ? transactionStatus.amount.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 4,
+                      })
+                    : '0.00'} USDm has been completed.
                 </p>
                 {transactionStatus.txHash && (
                   <div className="mb-4">
@@ -863,7 +1098,78 @@ export default function AIAssistantPage() {
 
           {/* Chat Input - Fixed at bottom */}
           <div className="p-4 lg:p-6">
-            <div className="max-w-4xl mx-auto flex items-center gap-2 sm:gap-3">
+            <div className="max-w-4xl mx-auto space-y-3">
+              {/* Quick asset selector when a tx draft awaits asset choice */}
+              {(txDraft || infoDraft) && (
+                <div className="flex items-center justify-between gap-3 bg-white/5 border border-white/10 rounded-lg p-3">
+                  <div className="text-white/80 text-sm">
+                    {txDraft ? (
+                      (() => {
+                        const amt = typeof txDraft.amount === 'number' ? txDraft.amount : inferAmountFromText(lastUserMessage)
+                        const amtStr = typeof amt === 'number'
+                          ? amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+                          : '0.00'
+                        return <>Select asset for {txDraft.action}: ${amtStr}</>
+                      })()
+                    ) : infoDraft ? (
+                      <>Select asset for {infoDraft.kind === 'apy' ? 'APY' : 'balance'}</>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(['CUSD','USDC','USDT'] as const).map(sym => (
+                      <button
+                        key={sym}
+                        onClick={() => {
+                          const nextAsset = sym
+                          setTxAsset(nextAsset)
+                          setTxAssetLabel(nextAsset === 'CUSD' ? 'USDm' : nextAsset)
+                          setTxDecimals(nextAsset === 'USDC' || nextAsset === 'USDT' ? 6 : 18)
+                          if (txDraft) {
+                            // promote draft to active pending transaction
+                            const amt = typeof txDraft.amount === 'number' ? txDraft.amount : inferAmountFromText(lastUserMessage) || 0
+                            setTransactionStatus({
+                              type: txDraft.action,
+                              amount: amt,
+                              status: 'pending',
+                            })
+                            setTxDraft(null)
+                            setMessages((prev) => [
+                              ...prev,
+                              {
+                                role: 'assistant',
+                                content: `Great — we'll use ${nextAsset === 'CUSD' ? 'USDm' : nextAsset} for this ${txDraft.action}.`,
+                                timestamp: new Date(),
+                              },
+                            ])
+                          } else if (infoDraft && address) {
+                            // fetch balance/APY snapshot and answer
+                            loadAssetSnapshot(nextAsset, address as Address)
+                              .then((snap) => {
+                                const daily = (snap.vault * (snap.apy / 100)) / 365
+                                setMessages((prev) => [
+                                  ...prev,
+                                  {
+                                    role: 'assistant',
+                                    content:
+                                      infoDraft.kind === 'apy'
+                                        ? `Current APY for ${snap.symbol}: ${snap.apy.toFixed(2)}%. Estimated daily earnings: ${daily.toFixed(6)} ${snap.symbol}/day (on your vault balance of ${snap.vault.toFixed(6)} ${snap.symbol}).`
+                                        : `For ${snap.symbol}: Vault balance ${snap.vault.toFixed(6)} ${snap.symbol}, Wallet ${snap.wallet.toFixed(6)} ${snap.symbol}.`,
+                                    timestamp: new Date(),
+                                  },
+                                ])
+                              })
+                              .finally(() => setInfoDraft(null))
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-md text-xs border border-white/10 text-white/80 hover:bg-white/10"
+                      >
+                        {sym === 'CUSD' ? 'USDm' : sym}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-2 sm:gap-3">
               <input
                 type="text"
                 value={input}
@@ -889,6 +1195,7 @@ export default function AIAssistantPage() {
                 <Send className="w-5 h-5" />
                 )}
               </button>
+              </div>
             </div>
           </div>
         </main>

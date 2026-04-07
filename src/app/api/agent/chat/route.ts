@@ -114,6 +114,8 @@ export async function POST(request: Request) {
     let transactionRequest: { action: 'deposit' | 'withdraw'; amount_usdm: number } | null = null
     let lastText = ''
 
+    // (Reverted: no pre-parse; let the provider tools determine intents)
+
     const systemPrompt = walletAddress
       ? `${AGENT_SYSTEM_PROMPT}\n\nThe connected user's wallet address is: ${walletAddress}. Use this address when calling get_vault_balance, get_wallet_balance, get_transaction_history, or get_total_earnings.`
       : AGENT_SYSTEM_PROMPT

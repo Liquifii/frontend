@@ -16,7 +16,7 @@ import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { useAccount, useReadContract, useEnsName } from 'wagmi'
 import { formatUnits, type Address } from 'viem'
-import { AttestifyVaultContract, StrategyContract, CUSD_ADDRESS } from '../../abi'
+import { AttestifyVaultContract, StrategyContract, CUSD_ADDRESS, REGISTRY_ADDRESS, REGISTRY_ABI, TOKENS } from '../../abi'
 import YieldAnimation from '../../../components/yield-animation'
 
 export default function DashboardPage() {
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; value: number; label: string; date: Date } | null>(null)
   const [mounted, setMounted] = useState(false)
   const [farcasterUsername, setFarcasterUsername] = useState<string | null>(null)
+  const [apyAsset, setApyAsset] = useState<'USDC' | 'USDT' | 'USDM'>('USDC')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [lastSeenTxTimestamp, setLastSeenTxTimestamp] = useState<number>(0)
   const notificationsRef = useRef<HTMLDivElement>(null)
@@ -83,15 +84,48 @@ export default function DashboardPage() {
       type: 'function',
     },
   ] as const
+  const apyTokenSymbol = apyAsset === 'USDC' ? 'USDC' : apyAsset === 'USDT' ? 'USDT' : 'USDm'
+  const apyTokenDecimals = TOKENS[apyAsset]?.decimals ?? 18
+  
+  // Resolve vault and strategy for selected asset BEFORE using in other reads
+  const apyTokenAddress = TOKENS[apyAsset].address as Address
+  const { data: apyVault } = useReadContract({
+    address: REGISTRY_ADDRESS as Address,
+    abi: REGISTRY_ABI,
+    functionName: 'getVault',
+    args: [apyTokenAddress],
+    query: { enabled: true, refetchInterval: 30000 },
+  })
+  const { data: apyStrategyAddr } = useReadContract({
+    address: (typeof apyVault === 'string' && apyVault !== '0x0000000000000000000000000000000000000000'
+      ? (apyVault as Address)
+      : (AttestifyVaultContract.address as Address)),
+    abi: AttestifyVaultContract.AttestifyVault,
+    functionName: 'strategy',
+    query: { enabled: true, refetchInterval: 30000 },
+  })
+  const { 
+    data: apyBasisPoints,
+    isLoading: isLoadingAPY,
+  } = useReadContract({
+    address: (typeof apyStrategyAddr === 'string'
+      ? (apyStrategyAddr as Address)
+      : (StrategyContract.address as Address)),
+    abi: StrategyContract.Strategy,
+    functionName: 'getCurrentAPY',
+    query: { enabled: true, refetchInterval: 30000 },
+  })
 
-  // Read user's wallet cUSD balance
+  // (moved earlier)
+
+  // Read user's wallet balance for selected asset
   const { 
     data: walletBalance,
     isLoading: isLoadingWalletBalance,
     error: walletBalanceError,
     refetch: refetchWalletBalance
   } = useReadContract({
-    address: CUSD_ADDRESS as Address,
+    address: (TOKENS[apyAsset]?.address as Address) ?? (CUSD_ADDRESS as Address),
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
@@ -102,14 +136,16 @@ export default function DashboardPage() {
   })
 
 
-  // Read user's vault balance
+  // Read user's vault balance for selected asset (via registry-resolved vault)
   const { 
     data: userVaultBalance, 
     isLoading: isLoadingBalance,
     error: balanceError,
     refetch: refetchVaultBalance
   } = useReadContract({
-    address: AttestifyVaultContract.address as Address,
+    address: (typeof apyVault === 'string' && apyVault !== '0x0000000000000000000000000000000000000000'
+      ? (apyVault as Address)
+      : (AttestifyVaultContract.address as Address)),
     abi: AttestifyVaultContract.AttestifyVault,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
@@ -121,14 +157,16 @@ export default function DashboardPage() {
     },
   })
 
-  // Read total vault assets
+  // Read total vault assets for selected asset vault
   const { 
     data: totalAssets,
     isLoading: isLoadingTotalAssets,
     error: totalAssetsError,
     refetch: refetchTotalAssets
   } = useReadContract({
-    address: AttestifyVaultContract.address as Address,
+    address: (typeof apyVault === 'string' && apyVault !== '0x0000000000000000000000000000000000000000'
+      ? (apyVault as Address)
+      : (AttestifyVaultContract.address as Address)),
     abi: AttestifyVaultContract.AttestifyVault,
     functionName: 'totalAssets',
     query: {
@@ -138,22 +176,7 @@ export default function DashboardPage() {
     },
   })
 
-  // Read strategy APY
-  const { 
-    data: apyBasisPoints,
-    isLoading: isLoadingAPY,
-    error: apyError,
-    refetch: refetchAPY
-  } = useReadContract({
-    address: StrategyContract.address as Address,
-    abi: StrategyContract.Strategy,
-    functionName: 'getCurrentAPY',
-    query: {
-      enabled: isConnected && !!StrategyContract.address,
-      retry: 2,
-      refetchInterval: 30000, // APY changes less frequently, refresh every 30 seconds
-    },
-  })
+  // (Removed duplicate APY resolution - now defined earlier)
 
 
   // Calculate APY percentage (basis points / 100)
@@ -161,7 +184,7 @@ export default function DashboardPage() {
 
   // Calculate daily earnings (approximate)
   const dailyEarnings = userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint' && apyPercent
-    ? (Number(formatUnits(userVaultBalance, 18)) * apyPercent / 100) / 365
+    ? (Number(formatUnits(userVaultBalance, apyTokenDecimals)) * apyPercent / 100) / 365
     : null
 
   const GET_DEPOSITS = gql`
@@ -419,7 +442,7 @@ export default function DashboardPage() {
                 {isConnected ? `Hi ${displayName}` : 'Hi Guest'}
               </h2>
               <p className="text-white/60 text-sm sm:text-base">
-                Start earning yield on your cUSD
+                Start earning yield on your {apyTokenSymbol}
               </p>
               {!isConnected && (
                 <p className="text-yellow-400 text-xs mt-1">
@@ -573,25 +596,25 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <p className="text-3xl font-bold text-white mb-2">
-                {balanceVisible ? (
-                  isLoadingBalance
-                    ? 'Loading...'
-                    : userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint'
-                    ? `$${parseFloat(formatUnits(userVaultBalance, 18)).toFixed(2)}`
-                    : isConnected
-                    ? '$0.00'
-                    : '$0.00'
-                ) : (
-                  '••••••'
-                )}
-              </p>
+                  {balanceVisible ? (
+                    isLoadingBalance
+                      ? 'Loading...'
+                      : userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint'
+                      ? `${parseFloat(formatUnits(userVaultBalance, apyTokenDecimals)).toFixed(6)} ${apyTokenSymbol}`
+                      : isConnected
+                      ? `0.000000 ${apyTokenSymbol}`
+                      : `0.000000 ${apyTokenSymbol}`
+                  ) : (
+                    '••••••'
+                  )}
+                </p>
               {balanceVisible && (
                 <>
                   <p className="text-green-400 text-sm">
                     {isLoadingBalance
                       ? 'Calculating...'
-                      : dailyEarnings !== null
-                      ? `+${dailyEarnings.toFixed(6)} cUSD/day`
+                  : dailyEarnings !== null
+                  ? `+${dailyEarnings.toFixed(6)} ${apyTokenSymbol}/day`
                       : isConnected
                       ? '$0.00/day'
                       : 'Connect wallet to see earnings'}
@@ -601,8 +624,8 @@ export default function DashboardPage() {
                       Wallet: {isLoadingWalletBalance 
                         ? 'Loading...' 
                         : walletBalance !== undefined && walletBalance !== null && typeof walletBalance === 'bigint'
-                        ? `${formatUnits(walletBalance, 18)} cUSD`
-                        : '0.00 cUSD'}
+                        ? `${formatUnits(walletBalance, apyTokenDecimals)} ${apyTokenSymbol}`
+                        : `0.00 ${apyTokenSymbol}`}
                     </p>
                   )}
                 </>
@@ -612,7 +635,22 @@ export default function DashboardPage() {
 
             {/* Current APY Card */}
             <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6">
-              <h3 className="text-white/70 text-sm font-medium mb-4">Current APY</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white/70 text-sm font-medium">Current APY</h3>
+                <div className="flex items-center gap-2">
+                  {(['USDC','USDT','USDM'] as const).map(sym => (
+                    <button
+                      key={sym}
+                      onClick={() => setApyAsset(sym)}
+                      className={`px-2 py-1 rounded-md text-xs border ${
+                        apyAsset === sym ? 'border-[#2BA3FF] text-white bg-[#2BA3FF]/10' : 'border-white/10 text-white/70 hover:bg-white/5'
+                      }`}
+                    >
+                      {sym}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <p className="text-3xl font-bold text-white mb-2">
                 {isLoadingAPY
                   ? 'Loading...'
@@ -642,12 +680,12 @@ export default function DashboardPage() {
                     ? 'Loading...'
                     : userVaultBalance !== undefined && userVaultBalance !== null && typeof userVaultBalance === 'bigint'
                     ? (() => {
-                        const userBalance = Number(formatUnits(userVaultBalance, 18))
-                        return userBalance > 0 ? userBalance.toFixed(6) : '0.000000'
+                        const userBalance = Number(formatUnits(userVaultBalance, apyTokenDecimals))
+                        return userBalance > 0 ? `${userBalance.toFixed(6)} ${apyTokenSymbol}` : `0.000000 ${apyTokenSymbol}`
                       })()
                     : isConnected
-                    ? '0.000000'
-                    : '0.000000'
+                    ? `0.000000 ${apyTokenSymbol}`
+                    : `0.000000 ${apyTokenSymbol}`
                 ) : (
                   '••••••'
                 )}
@@ -931,7 +969,7 @@ export default function DashboardPage() {
                     }}
                   >
                     <div className="text-white text-sm font-semibold mb-1">
-                      ${hoveredPoint.value.toFixed(6)} cUSD
+                      ${hoveredPoint.value.toFixed(6)} {apyTokenSymbol}
                     </div>
                     <div className="text-white/60 text-xs">
                       {hoveredPoint.label}
